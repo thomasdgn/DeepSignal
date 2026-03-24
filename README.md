@@ -1,2 +1,318 @@
 # DeepSignal
-Pacifica Hackathon - 'DeepSignal' WhaleWatcher Project - BONNIER Tino / DEGARDIN Thomas
+
+Pacifica Hackathon project for the `Analytics & Data` track.
+
+DeepSignal is a whale-watcher foundation built on Pacifica market data. It now covers:
+
+- Pacifica REST + WebSocket ingestion
+- real-time whale trade detection
+- local SQLite storage for whale alerts and tracked accounts
+- local HTML dashboard generation
+- ELFA AI live enrichment support
+
+## Shared Repo Safety
+
+This repository is set up so you and your teammate can work on different machines without pushing machine-specific files into Git.
+
+Kept out of Git on purpose:
+
+- `.env`
+- `watchlist.local.json`
+- `data/`
+- `reports/`
+- `*.db`
+
+That means:
+
+- each developer keeps their own secrets locally
+- each developer keeps their own local database and generated reports
+- no OS-specific absolute paths are committed
+- the code stays portable across Windows, macOS, and Linux as long as Python works
+
+Safe things to commit:
+
+- source code
+- `requirements.txt`
+- `.env.example`
+- `watchlist.example.json`
+- documentation and tests
+
+## Current Foundation
+
+Main modules:
+
+- `deepsignal/pacifica/rest.py`: Pacifica REST client
+- `deepsignal/pacifica/ws.py`: Pacifica WebSocket trade stream client
+- `deepsignal/detection.py`: whale detection rules
+- `deepsignal/storage.py`: local SQLite persistence
+- `deepsignal/watchlist.py`: tracked-account watchlist loader
+- `deepsignal/account_analysis.py`: account/watchlist sync
+- `deepsignal/reporting.py`: local dashboard generator
+- `deepsignal/sponsors/elfa_client.py`: ELFA REST client
+- `deepsignal/sponsors/elfa.py`: ELFA enrichment logic
+- `deepsignal/app.py`: orchestration
+- `deepsignal/cli.py`: CLI entrypoint
+
+## Pacifica Integration
+
+Aligned with Pacifica docs and SDK structure:
+
+- REST base URL: `https://api.pacifica.fi/api/v1`
+- WebSocket base URL: `wss://ws.pacifica.fi/ws`
+- Testnet REST base URL: `https://test-api.pacifica.fi/api/v1`
+- Testnet WebSocket base URL: `wss://test-ws.pacifica.fi/ws`
+
+Endpoints currently used or prepared:
+
+- `GET /info`
+- `GET /trades?symbol=...`
+- `GET /account?account=...`
+- `GET /account/balance/history?account=...`
+- WebSocket `trades` subscription
+
+Useful links:
+
+- Pacifica builder docs: https://docs.pacifica.fi/builder-program
+- Pacifica API docs: https://docs.pacifica.fi/api-documentation/api
+- Pacifica Python SDK: https://github.com/pacifica-fi/python-sdk
+- ELFA API docs: https://docs.elfa.ai/
+- ELFA hackathon docs: https://go.elfa.ai/docs-hackathon
+
+## Sponsor Choice
+
+`ELFA AI` is still the best sponsor fit right now.
+
+Why:
+
+- it directly strengthens the analytics story
+- it can add external context to whale events
+- it gives you a cleaner demo narrative than adding unrelated integrations
+
+Other sponsors are less relevant for the current scope:
+
+- `Privy`: useful later if you build a user-facing app with wallet login
+- `Fuul`: useful if you add referrals, campaigns, or distribution loops
+- `Rhino.fi`: only useful if the product expands into cross-chain or bridging flows
+
+Pragmatic recommendation:
+
+- keep `ELFA AI` as the primary sponsor integration now
+- consider `Privy` later only if you decide to build a real web product around user accounts
+
+## Setup
+
+1. Create a virtual environment.
+
+Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+macOS/Linux:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+2. Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+3. Create your local environment file.
+
+Windows PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+macOS/Linux:
+
+```bash
+cp .env.example .env
+```
+
+4. Create your local watchlist file.
+
+Windows PowerShell:
+
+```powershell
+Copy-Item watchlist.example.json watchlist.local.json
+```
+
+macOS/Linux:
+
+```bash
+cp watchlist.example.json watchlist.local.json
+```
+
+5. Fill `.env` with at least:
+
+- `PACIFICA_ENV=testnet`
+- `PACIFICA_SYMBOLS=BTC,ETH,SOL`
+- `WHALE_NOTIONAL_USD=100000`
+- `DEEPSIGNAL_DB_PATH=data/deepsignal.db`
+- `DEEPSIGNAL_REPORTS_DIR=reports`
+- `DEEPSIGNAL_WATCHLIST_PATH=watchlist.local.json`
+- `ELFA_BASE_URL=https://api.elfa.ai`
+
+Optional:
+
+- `PACIFICA_ACCOUNT` for one default tracked account
+- `PACIFICA_PRIVATE_KEY` only if you later add signed trading actions
+- `ELFA_API_KEY` for live ELFA enrichment
+
+6. Edit `watchlist.local.json` with the Pacifica account addresses you want to track.
+
+## How To Run
+
+### 1. Check the base connection
+
+```bash
+python -m deepsignal.cli bootstrap
+```
+
+This prints current Pacifica market context and confirms the app can start.
+
+### 2. Sync tracked accounts
+
+```bash
+python -m deepsignal.cli sync-watchlist
+```
+
+This fetches the accounts from `watchlist.local.json` and stores snapshots in your local SQLite database.
+
+### 3. Start the whale monitor
+
+```bash
+python -m deepsignal.cli monitor
+```
+
+This listens to Pacifica trade data and stores whale alerts locally in `data/deepsignal.db`.
+
+### 4. Generate the dashboard
+
+```bash
+python -m deepsignal.cli dashboard
+```
+
+Custom time window:
+
+```bash
+python -m deepsignal.cli --lookback-hours 72 dashboard
+```
+
+This writes a local HTML dashboard to `reports/dashboard.html`.
+
+## Recommended Local Workflow
+
+1. Activate your virtual environment.
+2. Run `python -m deepsignal.cli bootstrap`
+3. Run `python -m deepsignal.cli sync-watchlist`
+4. Run `python -m deepsignal.cli monitor`
+5. In another terminal, run `python -m deepsignal.cli dashboard`
+
+If your teammate does the same on their machine, both of you can pull and push safely because local state stays out of the repository.
+
+## How To Fill `.env`
+
+What each variable means and where to get it:
+
+- `PACIFICA_ENV`
+  Use `testnet` while building. Switch to `mainnet` only if you intentionally want production endpoints.
+
+- `PACIFICA_REST_URL`
+  You can leave this blank. The app now auto-fills it from `PACIFICA_ENV`.
+  Defaults:
+  - `testnet` -> `https://test-api.pacifica.fi/api/v1`
+  - `mainnet` -> `https://api.pacifica.fi/api/v1`
+
+- `PACIFICA_WS_URL`
+  You can leave this blank too. The app auto-fills it from `PACIFICA_ENV`.
+  Defaults:
+  - `testnet` -> `wss://test-ws.pacifica.fi/ws`
+  - `mainnet` -> `wss://ws.pacifica.fi/ws`
+
+- `PACIFICA_ACCOUNT`
+  Optional. This is a Pacifica account address you want to track by default.
+  You can get it from:
+  - your Pacifica testnet/mainnet app account page
+  - your wallet/account used with Pacifica
+  - or just leave it blank and instead put tracked accounts in `watchlist.local.json`
+
+- `PACIFICA_PRIVATE_KEY`
+  Optional for the current app. You do not need it for market data, whale monitoring, dashboard generation, or ELFA enrichment.
+  You only need it later if you implement signed order placement or account actions using Pacifica's SDK/examples.
+
+- `PACIFICA_SYMBOLS`
+  Symbols you want to watch, for example `BTC,ETH,SOL`.
+  Choose the markets you want to demo.
+
+- `WHALE_NOTIONAL_USD`
+  Your whale threshold. Example: `100000` means alerts start at $100k notional.
+
+- `DEEPSIGNAL_DATA_DIR`
+  Local folder for generated app data. `data` is fine.
+
+- `DEEPSIGNAL_DB_PATH`
+  Local SQLite file path. `data/deepsignal.db` is fine.
+
+- `DEEPSIGNAL_REPORTS_DIR`
+  Local folder for generated dashboards. `reports` is fine.
+
+- `DEEPSIGNAL_WATCHLIST_PATH`
+  Local path to your tracked-account file. `watchlist.local.json` is fine.
+
+- `ELFA_BASE_URL`
+  Leave as `https://api.elfa.ai`.
+
+- `ELFA_API_KEY`
+  Get this from ELFA:
+  1. create an account at `https://go.elfa.ai/dev-hackathon`
+  2. generate an API key in the developer dashboard
+  3. upgrade/unlock the Pay-As-You-Go tier as requested by ELFA
+  4. claim the sponsored credits with `https://elfa-ai.typeform.com/elfa-x-pacfica`
+
+Recommended `.env` for your current stage:
+
+```env
+PACIFICA_ENV=testnet
+PACIFICA_REST_URL=
+PACIFICA_WS_URL=
+PACIFICA_ACCOUNT=
+PACIFICA_PRIVATE_KEY=
+PACIFICA_SYMBOLS=BTC,ETH,SOL
+WHALE_NOTIONAL_USD=100000
+DEEPSIGNAL_DATA_DIR=data
+DEEPSIGNAL_DB_PATH=data/deepsignal.db
+DEEPSIGNAL_REPORTS_DIR=reports
+DEEPSIGNAL_WATCHLIST_PATH=watchlist.local.json
+ELFA_BASE_URL=https://api.elfa.ai
+ELFA_API_KEY=
+```
+
+Also fix your `watchlist.local.json`: replace `replace-with-pacifica-account` with a real Pacifica account, or remove the sample entry until you have one.
+
+## What Step 1, 2, and 3 Now Mean In This Repo
+
+Already implemented:
+
+1. Persistent storage for whale alerts and account snapshots in SQLite
+2. Dashboard generation for symbol activity, side breakdown, recent alerts, and tracked accounts
+3. Watchlist-based account sync for whale/account analysis
+
+Good next upgrades:
+
+1. Add historical trend charts from stored account balance history
+2. Score repeated whale behavior and abnormal bursts
+3. Replace the current ELFA placeholder with live enrichment calls
+4. Add a proper web UI or alert bot for demo day
+
+## Hackathon Positioning
+
+`DeepSignal helps traders identify abnormal whale flow on Pacifica in real time, store those events, monitor tracked accounts, and enrich market signals with external context.`

@@ -1,0 +1,83 @@
+from __future__ import annotations
+
+from typing import Any
+
+import requests
+
+
+class ElfaApiClient:
+    def __init__(self, api_key: str, base_url: str = "https://api.elfa.ai", timeout: int = 15) -> None:
+        self.api_key = api_key
+        self.base_url = base_url.rstrip("/")
+        self.timeout = timeout
+
+    def get_key_status(self) -> dict[str, Any]:
+        return self._get("/v2/key-status")
+
+    def get_top_mentions(
+        self,
+        ticker: str,
+        *,
+        time_window: str = "1h",
+        page: int = 1,
+        page_size: int = 3,
+    ) -> dict[str, Any]:
+        return self._get(
+            "/v2/data/top-mentions",
+            params={
+                "ticker": ticker.lower(),
+                "timeWindow": time_window,
+                "page": page,
+                "pageSize": page_size,
+            },
+        )
+
+    def get_token_news(
+        self,
+        ticker: str,
+        *,
+        time_window: str = "24h",
+        page: int = 1,
+        page_size: int = 3,
+    ) -> dict[str, Any]:
+        return self._get(
+            "/v2/data/token-news",
+            params={
+                "ticker": ticker.lower(),
+                "timeWindow": time_window,
+                "page": page,
+                "pageSize": page_size,
+            },
+        )
+
+    def get_trending_narratives(
+        self,
+        *,
+        time_window: str = "24h",
+        page: int = 1,
+        page_size: int = 5,
+    ) -> dict[str, Any]:
+        return self._get(
+            "/v2/data/trending-narratives",
+            params={
+                "timeWindow": time_window,
+                "page": page,
+                "pageSize": page_size,
+            },
+        )
+
+    def _get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        try:
+            response = requests.get(
+                f"{self.base_url}{path}",
+                headers={
+                    "Accept": "application/json",
+                    "x-elfa-api-key": self.api_key,
+                },
+                params=params,
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as exc:
+            raise RuntimeError(f"ELFA request failed for {path}: {exc}") from exc

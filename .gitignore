@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.env
+watchlist.local.json
+data/
+reports/
+dist/
+build/
+*.pyc
+*.db
