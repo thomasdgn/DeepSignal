@@ -6,9 +6,11 @@ DeepSignal is a whale-watcher foundation built on Pacifica market data. It now c
 
 - Pacifica REST + WebSocket ingestion
 - real-time whale trade detection
+- whale scoring and ranked alerting
 - local SQLite storage for whale alerts and tracked accounts
 - local HTML dashboard generation
-- ELFA AI live enrichment support
+- ELFA AI live enrichment and narrative explainers
+- Discord/webhook alert delivery for high-score whale events
 
 ## Shared Repo Safety
 
@@ -166,6 +168,12 @@ Optional:
 - `PACIFICA_ACCOUNT` for one default tracked account
 - `PACIFICA_PRIVATE_KEY` only if you later add signed trading actions
 - `ELFA_API_KEY` for live ELFA enrichment
+- `ALERT_MIN_SCORE` to control which whale alerts are sent externally
+- `ALERT_DEDUP_SECONDS` to suppress near-identical repeated alerts
+- `ALERT_SYMBOL_COOLDOWN_SECONDS` to limit symbol-level alert spam
+- `ALERT_SUMMARY_THRESHOLD` to emit a compressed summary after repeated suppressed alerts
+- `DISCORD_WEBHOOK_URL` for Discord delivery
+- `GENERIC_ALERT_WEBHOOK_URL` for a generic JSON webhook
 
 6. Edit `watchlist.local.json` with the Pacifica account addresses you want to track.
 
@@ -208,6 +216,14 @@ python -m deepsignal.cli --lookback-hours 72 dashboard
 ```
 
 This writes a local HTML dashboard to `reports/dashboard.html`.
+
+### 5. Seed demo data
+
+```bash
+python -m deepsignal.cli seed-demo
+```
+
+This clears stored whale alerts and replaces them with a deterministic demo dataset so you can present the full command center even if live market flow is quiet.
 
 ## Recommended Local Workflow
 
@@ -303,7 +319,7 @@ Also fix your `watchlist.local.json`: replace `replace-with-pacifica-account` wi
 Already implemented:
 
 1. Persistent storage for whale alerts and account snapshots in SQLite
-2. Dashboard generation for symbol activity, side breakdown, recent alerts, and tracked accounts
+2. Dashboard generation for ranked symbols, hot symbols, directional flow, scored alerts, timeline flow, and tracked accounts
 3. Watchlist-based account sync for whale/account analysis
 
 Good next upgrades:

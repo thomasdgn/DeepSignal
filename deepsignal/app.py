@@ -4,7 +4,9 @@ import asyncio
 from pathlib import Path
 
 from deepsignal.account_analysis import AccountAnalysisService
+from deepsignal.alerting import AlertDispatcher
 from deepsignal.config import Settings
+from deepsignal.demo import build_demo_alerts
 from deepsignal.detection import WhaleDetector
 from deepsignal.models import WhaleAlert
 from deepsignal.pacifica import PacificaRestClient, PacificaWebsocketClient
@@ -23,6 +25,14 @@ class DeepSignalApp:
         self.ws_client = PacificaWebsocketClient(settings.pacifica_ws_url)
         self.detector = WhaleDetector(settings.whale_notional_usd)
         self.elfa = ElfaSignalEnricher(settings.elfa_api_key, settings.elfa_base_url)
+        self.alert_dispatcher = AlertDispatcher(
+            min_score=settings.alert_min_score,
+            dedup_seconds=settings.alert_dedup_seconds,
+            symbol_cooldown_seconds=settings.alert_symbol_cooldown_seconds,
+            summary_threshold=settings.alert_summary_threshold,
+            discord_webhook_url=settings.discord_webhook_url,
+            generic_webhook_url=settings.generic_alert_webhook_url,
+        )
         self.storage = DeepSignalStorage(settings.database_path)
         self.account_analysis = AccountAnalysisService(self.rest_client, self.storage)
 
@@ -60,7 +70,12 @@ class DeepSignalApp:
 
             enriched = self.elfa.enrich(alert)
             self.storage.save_whale_alert(enriched)
+            dispatch_result = self.alert_dispatcher.dispatch(enriched)
             self._print_alert(enriched)
+            if dispatch_result.delivered:
+                print(f"  delivered_to={', '.join(dispatch_result.delivered)}")
+            elif dispatch_result.skipped_reason:
+                print(f"  alert_status={dispatch_result.skipped_reason}")
             await asyncio.sleep(0)
 
     def sync_watchlist_accounts(self) -> int:
@@ -80,6 +95,13 @@ class DeepSignalApp:
         report_path = self.settings.reports_dir / "dashboard.html"
         return render_dashboard_report(report_path, dashboard_data)
 
+    def seed_demo_data(self) -> int:
+        demo_alerts = build_demo_alerts(self.settings.whale_notional_usd)
+        self.storage.clear_whale_alerts()
+        for alert in demo_alerts:
+            self.storage.save_whale_alert(alert)
+        return len(demo_alerts)
+
     def load_watchlist(self) -> list[WatchlistEntry]:
         return load_watchlist(self.settings.watchlist_path)
 
@@ -89,6 +111,7 @@ class DeepSignalApp:
         print(
             f"[{alert.severity.upper()}] {trade.symbol} "
             f"{trade.side} ${trade.notional_usd:,.2f} "
+            f"score={alert.score:,.2f} "
             f"at {trade.timestamp.isoformat()} tags={tags}"
         )
         if alert.enrichment:

@@ -26,6 +26,12 @@ class Settings:
     watchlist_path: Path
     elfa_base_url: str
     elfa_api_key: str | None
+    alert_min_score: float
+    alert_dedup_seconds: int
+    alert_symbol_cooldown_seconds: int
+    alert_summary_threshold: int
+    discord_webhook_url: str | None
+    generic_alert_webhook_url: str | None
 
 
 def load_settings() -> Settings:
@@ -52,6 +58,12 @@ def load_settings() -> Settings:
         watchlist_path=Path(_env_with_default("DEEPSIGNAL_WATCHLIST_PATH", "watchlist.local.json")),
         elfa_base_url=_env_with_default("ELFA_BASE_URL", "https://api.elfa.ai"),
         elfa_api_key=_optional_env("ELFA_API_KEY"),
+        alert_min_score=float(os.getenv("ALERT_MIN_SCORE", "60")),
+        alert_dedup_seconds=int(os.getenv("ALERT_DEDUP_SECONDS", "90")),
+        alert_symbol_cooldown_seconds=int(os.getenv("ALERT_SYMBOL_COOLDOWN_SECONDS", "300")),
+        alert_summary_threshold=int(os.getenv("ALERT_SUMMARY_THRESHOLD", "3")),
+        discord_webhook_url=_optional_env("DISCORD_WEBHOOK_URL"),
+        generic_alert_webhook_url=_optional_env("GENERIC_ALERT_WEBHOOK_URL"),
     )
 
 

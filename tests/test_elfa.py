@@ -30,6 +30,7 @@ class ElfaTests(unittest.TestCase):
         result = enricher.enrich(_build_alert())
 
         self.assertEqual(result.enrichment["elfa_status"], "disabled")
+        self.assertEqual(result.enrichment["elfa_symbol"], "BTC")
 
     @patch("deepsignal.sponsors.elfa.ElfaApiClient")
     def test_live_enrichment_with_api_key(self, client_cls) -> None:
@@ -45,6 +46,8 @@ class ElfaTests(unittest.TestCase):
         self.assertEqual(result.enrichment["elfa_top_mentions_count"], 1)
         self.assertEqual(result.enrichment["elfa_token_news_count"], 1)
         self.assertEqual(result.enrichment["elfa_trending_narratives_count"], 1)
+        self.assertEqual(result.enrichment["elfa_market_signal"], "low-attention")
+        self.assertTrue(result.enrichment["elfa_explainer"])
 
 
 if __name__ == "__main__":

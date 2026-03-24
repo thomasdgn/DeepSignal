@@ -17,10 +17,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "command",
-        choices=("bootstrap", "monitor", "sync-watchlist", "dashboard"),
+        choices=("bootstrap", "monitor", "sync-watchlist", "dashboard", "seed-demo"),
         help=(
             "bootstrap prints current Pacifica market context, monitor streams whale alerts, "
-            "sync-watchlist stores tracked account snapshots, dashboard generates a local HTML report"
+            "sync-watchlist stores tracked account snapshots, dashboard generates a local HTML report, "
+            "seed-demo writes deterministic demo alerts into the local database"
         ),
     )
     return parser
@@ -44,6 +45,11 @@ def main() -> None:
     if args.command == "dashboard":
         report_path = app.generate_dashboard(lookback_hours=args.lookback_hours)
         print(f"Dashboard generated at {report_path}")
+        return
+
+    if args.command == "seed-demo":
+        seeded = app.seed_demo_data()
+        print(f"Seeded {seeded} demo whale alert(s)")
         return
 
     asyncio.run(app.run_trade_monitor())

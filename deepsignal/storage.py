@@ -23,8 +23,9 @@ class DeepSignalStorage:
                 """
                 INSERT INTO whale_alerts (
                     symbol, price, amount, notional_usd, side, cause, timestamp_ms,
-                    sequence_id, source, threshold_usd, severity, tags_json, enrichment_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    sequence_id, source, threshold_usd, severity, score, tags_json,
+                    score_breakdown_json, enrichment_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     trade.symbol,
@@ -38,7 +39,9 @@ class DeepSignalStorage:
                     trade.source,
                     alert.threshold_usd,
                     alert.severity,
+                    alert.score,
                     json.dumps(list(alert.tags)),
+                    json.dumps(alert.score_breakdown),
                     json.dumps(alert.enrichment),
                 ),
             )
@@ -71,6 +74,11 @@ class DeepSignalStorage:
             )
             connection.commit()
 
+    def clear_whale_alerts(self) -> None:
+        with closing(self._connect()) as connection:
+            connection.execute("DELETE FROM whale_alerts")
+            connection.commit()
+
     def get_dashboard_data(self, lookback_hours: int = 24) -> dict[str, Any]:
         lookback_ms = lookback_hours * 60 * 60 * 1000
         with closing(self._connect()) as connection:
@@ -84,7 +92,8 @@ class DeepSignalStorage:
                 SELECT
                     COUNT(*),
                     COALESCE(SUM(notional_usd), 0),
-                    COALESCE(MAX(notional_usd), 0)
+                    COALESCE(MAX(notional_usd), 0),
+                    COALESCE(MAX(score), 0)
                 FROM whale_alerts
                 WHERE timestamp_ms >= ?
                 """,
@@ -93,11 +102,16 @@ class DeepSignalStorage:
 
             top_symbols = connection.execute(
                 """
-                SELECT symbol, COUNT(*) AS event_count, ROUND(SUM(notional_usd), 2) AS total_notional
+                SELECT
+                    symbol,
+                    COUNT(*) AS event_count,
+                    ROUND(SUM(notional_usd), 2) AS total_notional,
+                    ROUND(AVG(score), 2) AS avg_score,
+                    ROUND(MAX(score), 2) AS max_score
                 FROM whale_alerts
                 WHERE timestamp_ms >= ?
                 GROUP BY symbol
-                ORDER BY total_notional DESC, event_count DESC
+                ORDER BY max_score DESC, total_notional DESC, event_count DESC
                 LIMIT 10
                 """,
                 (window_start,),
@@ -123,6 +137,158 @@ class DeepSignalStorage:
                 """
             ).fetchall()
 
+            ranked_alerts = connection.execute(
+                """
+                SELECT
+                    symbol,
+                    side,
+                    severity,
+                    ROUND(notional_usd, 2),
+                    ROUND(score, 2),
+                    timestamp_ms,
+                    tags_json,
+                    score_breakdown_json,
+                    enrichment_json
+                FROM whale_alerts
+                WHERE timestamp_ms >= ?
+                ORDER BY score DESC, notional_usd DESC, timestamp_ms DESC
+                LIMIT 10
+                """,
+                (window_start,),
+            ).fetchall()
+
+            timeline = connection.execute(
+                """
+                SELECT
+                    (timestamp_ms / 3600000) * 3600000 AS bucket_start_ms,
+                    COUNT(*) AS event_count,
+                    ROUND(SUM(notional_usd), 2) AS total_notional,
+                    ROUND(MAX(score), 2) AS max_score
+                FROM whale_alerts
+                WHERE timestamp_ms >= ?
+                GROUP BY bucket_start_ms
+                ORDER BY bucket_start_ms DESC
+                LIMIT 12
+                """,
+                (window_start,),
+            ).fetchall()
+
+            narrative_summary = connection.execute(
+                """
+                SELECT
+                    symbol,
+                    ROUND(AVG(score), 2) AS avg_score,
+                    COUNT(*) AS event_count,
+                    ROUND(AVG(
+                        CASE
+                            WHEN json_valid(enrichment_json)
+                            THEN COALESCE(json_extract(enrichment_json, '$.elfa_attention_score'), 0)
+                            ELSE 0
+                        END
+                    ), 2) AS avg_attention_score,
+                    MAX(
+                        CASE
+                            WHEN json_valid(enrichment_json)
+                            THEN COALESCE(json_extract(enrichment_json, '$.elfa_market_signal'), '')
+                            ELSE ''
+                        END
+                    ) AS market_signal
+                FROM whale_alerts
+                WHERE timestamp_ms >= ?
+                GROUP BY symbol
+                ORDER BY avg_attention_score DESC, avg_score DESC
+                LIMIT 10
+                """,
+                (window_start,),
+            ).fetchall()
+
+            directional_flow = connection.execute(
+                """
+                SELECT
+                    symbol,
+                    ROUND(SUM(
+                        CASE
+                            WHEN LOWER(side) IN ('open_long', 'close_short') THEN notional_usd
+                            ELSE 0
+                        END
+                    ), 2) AS bullish_notional,
+                    ROUND(SUM(
+                        CASE
+                            WHEN LOWER(side) IN ('open_short', 'close_long') THEN notional_usd
+                            ELSE 0
+                        END
+                    ), 2) AS bearish_notional,
+                    ROUND(SUM(
+                        CASE
+                            WHEN LOWER(side) IN ('open_long', 'close_short') THEN notional_usd
+                            WHEN LOWER(side) IN ('open_short', 'close_long') THEN -notional_usd
+                            ELSE 0
+                        END
+                    ), 2) AS net_flow,
+                    ROUND(MAX(score), 2) AS max_score
+                FROM whale_alerts
+                WHERE timestamp_ms >= ?
+                GROUP BY symbol
+                ORDER BY ABS(net_flow) DESC, max_score DESC
+                LIMIT 10
+                """,
+                (window_start,),
+            ).fetchall()
+
+            pressure_split = connection.execute(
+                """
+                SELECT
+                    symbol,
+                    ROUND(SUM(CASE WHEN LOWER(side) = 'open_long' THEN notional_usd ELSE 0 END), 2),
+                    ROUND(SUM(CASE WHEN LOWER(side) = 'open_short' THEN notional_usd ELSE 0 END), 2),
+                    ROUND(SUM(CASE WHEN LOWER(side) = 'close_long' THEN notional_usd ELSE 0 END), 2),
+                    ROUND(SUM(CASE WHEN LOWER(side) = 'close_short' THEN notional_usd ELSE 0 END), 2)
+                FROM whale_alerts
+                WHERE timestamp_ms >= ?
+                GROUP BY symbol
+                ORDER BY symbol ASC
+                LIMIT 10
+                """,
+                (window_start,),
+            ).fetchall()
+
+            hot_symbols = connection.execute(
+                """
+                SELECT
+                    symbol,
+                    COUNT(*) AS event_count,
+                    ROUND(AVG(score), 2) AS avg_score,
+                    ROUND(MAX(score), 2) AS max_score,
+                    ROUND(AVG(
+                        CASE
+                            WHEN json_valid(enrichment_json)
+                            THEN COALESCE(json_extract(enrichment_json, '$.elfa_attention_score'), 0)
+                            ELSE 0
+                        END
+                    ), 2) AS avg_attention_score,
+                    ROUND(
+                        (AVG(score) * 0.65)
+                        + (
+                            AVG(
+                                CASE
+                                    WHEN json_valid(enrichment_json)
+                                    THEN COALESCE(json_extract(enrichment_json, '$.elfa_attention_score'), 0)
+                                    ELSE 0
+                                END
+                            ) * 0.35
+                        )
+                        + (COUNT(*) * 2.5),
+                        2
+                    ) AS hot_score
+                FROM whale_alerts
+                WHERE timestamp_ms >= ?
+                GROUP BY symbol
+                ORDER BY hot_score DESC, max_score DESC
+                LIMIT 10
+                """,
+                (window_start,),
+            ).fetchall()
+
             watchlist = connection.execute(
                 """
                 SELECT
@@ -145,8 +311,15 @@ class DeepSignalStorage:
             "total_alerts": int(totals[0]),
             "total_notional_usd": float(totals[1]),
             "largest_alert_usd": float(totals[2]),
+            "highest_score": float(totals[3]),
             "top_symbols": [
-                {"symbol": row[0], "event_count": int(row[1]), "total_notional_usd": float(row[2])}
+                {
+                    "symbol": row[0],
+                    "event_count": int(row[1]),
+                    "total_notional_usd": float(row[2]),
+                    "avg_score": float(row[3]),
+                    "max_score": float(row[4]),
+                }
                 for row in top_symbols
             ],
             "side_breakdown": [
@@ -163,6 +336,70 @@ class DeepSignalStorage:
                     "tags": json.loads(row[5] or "[]"),
                 }
                 for row in recent_alerts
+            ],
+            "ranked_alerts": [
+                {
+                    "symbol": row[0],
+                    "side": row[1],
+                    "severity": row[2],
+                    "notional_usd": float(row[3]),
+                    "score": float(row[4]),
+                    "timestamp_ms": int(row[5]),
+                    "tags": json.loads(row[6] or "[]"),
+                    "score_breakdown": json.loads(row[7] or "{}"),
+                    "enrichment": json.loads(row[8] or "{}"),
+                }
+                for row in ranked_alerts
+            ],
+            "timeline": [
+                {
+                    "bucket_start_ms": int(row[0]),
+                    "event_count": int(row[1]),
+                    "total_notional_usd": float(row[2]),
+                    "max_score": float(row[3]),
+                }
+                for row in timeline
+            ],
+            "narrative_summary": [
+                {
+                    "symbol": row[0],
+                    "avg_score": float(row[1]),
+                    "event_count": int(row[2]),
+                    "avg_attention_score": float(row[3] or 0),
+                    "market_signal": row[4] or "n/a",
+                }
+                for row in narrative_summary
+            ],
+            "directional_flow": [
+                {
+                    "symbol": row[0],
+                    "bullish_notional_usd": float(row[1]),
+                    "bearish_notional_usd": float(row[2]),
+                    "net_flow_usd": float(row[3]),
+                    "max_score": float(row[4]),
+                }
+                for row in directional_flow
+            ],
+            "pressure_split": [
+                {
+                    "symbol": row[0],
+                    "open_long_usd": float(row[1]),
+                    "open_short_usd": float(row[2]),
+                    "close_long_usd": float(row[3]),
+                    "close_short_usd": float(row[4]),
+                }
+                for row in pressure_split
+            ],
+            "hot_symbols": [
+                {
+                    "symbol": row[0],
+                    "event_count": int(row[1]),
+                    "avg_score": float(row[2]),
+                    "max_score": float(row[3]),
+                    "avg_attention_score": float(row[4]),
+                    "hot_score": float(row[5]),
+                }
+                for row in hot_symbols
             ],
             "watchlist_accounts": [
                 {
@@ -194,7 +431,9 @@ class DeepSignalStorage:
                     source TEXT NOT NULL,
                     threshold_usd REAL NOT NULL,
                     severity TEXT NOT NULL,
+                    score REAL NOT NULL DEFAULT 0,
                     tags_json TEXT NOT NULL,
+                    score_breakdown_json TEXT NOT NULL DEFAULT '{}',
                     enrichment_json TEXT NOT NULL
                 )
                 """
@@ -214,9 +453,31 @@ class DeepSignalStorage:
                 )
                 """
             )
+            self._ensure_column(connection, "whale_alerts", "score", "REAL NOT NULL DEFAULT 0")
+            self._ensure_column(
+                connection,
+                "whale_alerts",
+                "score_breakdown_json",
+                "TEXT NOT NULL DEFAULT '{}'",
+            )
+            connection.commit()
 
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.database_path)
+
+    def _ensure_column(
+        self,
+        connection: sqlite3.Connection,
+        table: str,
+        column: str,
+        definition: str,
+    ) -> None:
+        columns = {
+            row[1]
+            for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
+        }
+        if column not in columns:
+            connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
 
 def _optional_float(payload: dict[str, Any], keys: tuple[str, ...]) -> float | None:

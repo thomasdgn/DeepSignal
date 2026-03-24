@@ -40,6 +40,8 @@ class WhaleAlert:
     trade: Trade
     threshold_usd: float
     tags: tuple[str, ...] = field(default_factory=tuple)
+    score: float = 0.0
+    score_breakdown: dict[str, Any] = field(default_factory=dict)
     enrichment: dict[str, Any] = field(default_factory=dict)
 
     @property

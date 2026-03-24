@@ -81,6 +81,9 @@ class ElfaSignalEnricher:
             "elfa_top_mentions_preview": _extract_preview_text(mentions),
             "elfa_token_news_preview": _extract_preview_text(news),
             "elfa_trending_narratives_preview": _extract_preview_text(narratives),
+            "elfa_attention_score": _build_attention_score(mentions, news, narratives),
+            "elfa_market_signal": _build_market_signal(mentions, news, narratives),
+            "elfa_explainer": _build_explainer(mentions, news, narratives),
         }
 
 
@@ -106,3 +109,54 @@ def _extract_preview_text(payload: dict[str, object], limit: int = 3) -> list[st
                 preview.append(value.strip()[:160])
                 break
     return preview
+
+
+def _build_attention_score(
+    mentions: dict[str, object],
+    news: dict[str, object],
+    narratives: dict[str, object],
+) -> float:
+    score = (
+        _count_items(mentions) * 12
+        + _count_items(news) * 10
+        + _count_items(narratives) * 8
+    )
+    return float(min(score, 100))
+
+
+def _build_market_signal(
+    mentions: dict[str, object],
+    news: dict[str, object],
+    narratives: dict[str, object],
+) -> str:
+    attention_score = _build_attention_score(mentions, news, narratives)
+    if attention_score >= 70:
+        return "high-attention"
+    if attention_score >= 35:
+        return "rising-attention"
+    return "low-attention"
+
+
+def _build_explainer(
+    mentions: dict[str, object],
+    news: dict[str, object],
+    narratives: dict[str, object],
+) -> list[str]:
+    lines: list[str] = []
+
+    mention_preview = _extract_preview_text(mentions, limit=2)
+    if mention_preview:
+        lines.append(f"Mentions: {' | '.join(mention_preview)}")
+
+    news_preview = _extract_preview_text(news, limit=2)
+    if news_preview:
+        lines.append(f"News: {' | '.join(news_preview)}")
+
+    narrative_preview = _extract_preview_text(narratives, limit=2)
+    if narrative_preview:
+        lines.append(f"Narratives: {' | '.join(narrative_preview)}")
+
+    if not lines:
+        lines.append("ELFA returned limited narrative context for this symbol.")
+
+    return lines
