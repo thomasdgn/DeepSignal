@@ -1,20 +1,23 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import {
-  alertInbox,
-  eventFeed,
+  fallbackSnapshot,
   modes,
-  narratives,
-  symbols,
   type EventSeverity,
   type EventRecord,
   type Mode,
   type SymbolCard,
   type SymbolKey,
+  type TerminalSnapshot,
 } from "./data/demoData";
 
 type SeverityFilter = EventSeverity | "all";
 type SideFilter = EventRecord["side"] | "all";
+type Route =
+  | { page: "home" }
+  | { page: "terminal" }
+  | { page: "replay" }
+  | { page: "symbol"; symbol: SymbolKey };
 
 const signalAttention: Record<EventRecord["signal"], number> = {
   "high-attention": 95,
@@ -62,27 +65,68 @@ const modeMeta: Record<
 };
 
 function App() {
+  const [snapshot, setSnapshot] = useState<TerminalSnapshot>(fallbackSnapshot);
+  const [route, setRouteState] = useState<Route>(() => parseRoute(window.location.pathname));
   const [mode, setMode] = useState<Mode>("Demo");
   const [activeSymbol, setActiveSymbol] = useState<SymbolKey>("SOL");
-  const [selectedEventId, setSelectedEventId] = useState<string>(eventFeed[0].id);
+  const [selectedEventId, setSelectedEventId] = useState<string>(fallbackSnapshot.eventFeed[0].id);
   const [tickerIndex, setTickerIndex] = useState(0);
   const [query, setQuery] = useState("");
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
   const [sideFilter, setSideFilter] = useState<SideFilter>("all");
   const [minScore, setMinScore] = useState(70);
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const setRoute = useNavigate(setRouteState);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSnapshot() {
+      try {
+        const response = await fetch("/terminal-data.json", { cache: "no-store" });
+        if (!response.ok) {
+          return;
+        }
+        const payload = (await response.json()) as TerminalSnapshot;
+        if (!cancelled && payload.eventFeed?.length) {
+          setSnapshot(payload);
+        }
+      } catch {
+        // Keep the local fallback snapshot when the export has not been generated yet.
+      }
+    }
+
+    void loadSnapshot();
+
+    const handlePopState = () => {
+      setRouteState(parseRoute(window.location.pathname));
+    };
+
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (route.page === "symbol") {
+      setActiveSymbol(route.symbol);
+    }
+  }, [route]);
 
   useEffect(() => {
     setAutoRefresh(mode !== "Demo");
-    const firstEvent = getModeEvents(mode)[0];
+    const firstEvent = getModeEvents(mode, snapshot.eventFeed)[0];
     if (firstEvent) {
       setSelectedEventId(firstEvent.id);
       setActiveSymbol(firstEvent.symbol);
       setTickerIndex(0);
     }
-  }, [mode]);
+  }, [mode, snapshot.eventFeed]);
 
-  const modeEvents = useMemo(() => getModeEvents(mode), [mode]);
+  const modeEvents = useMemo(() => getModeEvents(mode, snapshot.eventFeed), [mode, snapshot.eventFeed]);
   const visibleEvents = useMemo(
     () =>
       modeEvents.filter((event) => {
@@ -102,8 +146,8 @@ function App() {
   const tickerEvents = visibleEvents.length > 0 ? visibleEvents : modeEvents;
 
   const activeCard = useMemo(
-    () => buildActiveCard(activeSymbol, visibleEvents),
-    [activeSymbol, visibleEvents],
+    () => buildActiveCard(activeSymbol, visibleEvents, snapshot.symbols),
+    [activeSymbol, snapshot.symbols, visibleEvents],
   );
   const selectedEvent = useMemo(
     () => visibleEvents.find((event) => event.id === selectedEventId) ?? visibleEvents[0] ?? modeEvents[0],
@@ -118,6 +162,14 @@ function App() {
   const rankedEvents = useMemo(
     () => [...visibleEvents].sort((left, right) => right.score - left.score),
     [visibleEvents],
+  );
+  const replaySymbols = useMemo(
+    () =>
+      snapshot.symbols.map((symbol) => ({
+        symbol,
+        events: visibleEvents.filter((event) => event.symbol === symbol.symbol),
+      })),
+    [snapshot.symbols, visibleEvents],
   );
 
   useEffect(() => {
@@ -162,81 +214,386 @@ function App() {
   return (
     <div className="terminal-shell">
       <AuroraBackground />
-      <main className="terminal-page">
-        <HeroSection mode={mode} setMode={setMode} activeCard={activeCard} />
-        <ControlsPanel
-          query={query}
-          severityFilter={severityFilter}
-          sideFilter={sideFilter}
-          minScore={minScore}
-          autoRefresh={autoRefresh}
-          onQueryChange={setQuery}
-          onSeverityChange={setSeverityFilter}
-          onSideChange={setSideFilter}
-          onMinScoreChange={setMinScore}
-          onAutoRefreshChange={setAutoRefresh}
-          onReset={() => {
-            setQuery("");
-            setSeverityFilter("all");
-            setSideFilter("all");
-            setMinScore(70);
-          }}
-        />
-        <TickerStrip
-          events={tickerEvents}
-          tickerIndex={tickerIndex}
-          onSelect={(event) => {
-            setSelectedEventId(event.id);
-            setActiveSymbol(event.symbol);
-          }}
-        />
-        <section className="kpi-grid">
-          {derivedKpis.map((item, index) => (
-            <motion.article
-              key={item.label}
-              className="kpi-card glass-card"
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.08 * index, duration: 0.45 }}
-            >
-              <span className="eyebrow">{item.label}</span>
-              <strong>{item.value}</strong>
-              <p>{item.note}</p>
-            </motion.article>
-          ))}
-        </section>
-        <section className="terminal-grid">
-          <div className="main-column">
-            <FocusPanel
-              activeCard={activeCard}
-              symbols={symbols}
-              activeSymbol={activeSymbol}
-              onSelect={setActiveSymbol}
+      <main className={route.page === "home" ? "landing-page" : "terminal-page"}>
+        <TopNav route={route} onNavigate={setRoute} />
+        {route.page === "home" ? (
+          <LandingPage
+            snapshot={snapshot}
+            activeCard={activeCard}
+            onEnterTerminal={() => setRoute({ page: "terminal" })}
+            onOpenReplay={() => setRoute({ page: "replay" })}
+            onOpenSymbol={(symbol) => setRoute({ page: "symbol", symbol })}
+          />
+        ) : null}
+        {route.page === "terminal" ? (
+          <>
+            <HeroSection mode={mode} setMode={setMode} activeCard={activeCard} />
+            <ControlsPanel
+              query={query}
+              severityFilter={severityFilter}
+              sideFilter={sideFilter}
+              minScore={minScore}
+              autoRefresh={autoRefresh}
+              onQueryChange={setQuery}
+              onSeverityChange={setSeverityFilter}
+              onSideChange={setSideFilter}
+              onMinScoreChange={setMinScore}
+              onAutoRefreshChange={setAutoRefresh}
+              onReset={() => {
+                setQuery("");
+                setSeverityFilter("all");
+                setSideFilter("all");
+                setMinScore(70);
+              }}
             />
-            <div className="split-grid">
-              <PressureCard activeSymbol={activeSymbol} events={visibleEvents} />
-              <TimelineCard rows={timelineRows} />
-            </div>
-            <NarrativeDeck activeSymbol={activeSymbol} selectedEvent={selectedEvent} />
-            <ReplayFeed
-              events={symbolEvents}
-              selectedEventId={selectedEventId}
-              onSelect={setSelectedEventId}
+            <TickerStrip
+              events={tickerEvents}
+              tickerIndex={tickerIndex}
+              onSelect={(event) => {
+                setSelectedEventId(event.id);
+                setActiveSymbol(event.symbol);
+              }}
             />
-          </div>
-          <aside className="side-column">
-            <RankedAlerts
-              events={rankedEvents}
-              activeSymbol={activeSymbol}
-              selectedEventId={selectedEventId}
-              onSelect={setSelectedEventId}
-            />
-            <SignalStack activeCard={activeCard} />
-            <InboxCard events={rankedEvents} />
-          </aside>
-        </section>
+            <section className="kpi-grid">
+              {derivedKpis.map((item, index) => (
+                <motion.article
+                  key={item.label}
+                  className="kpi-card glass-card"
+                  initial={{ opacity: 0, y: 18 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.08 * index, duration: 0.45 }}
+                >
+                  <span className="eyebrow">{item.label}</span>
+                  <strong>{item.value}</strong>
+                  <p>{item.note}</p>
+                </motion.article>
+              ))}
+            </section>
+            <section className="terminal-grid">
+              <div className="main-column">
+                <FocusPanel
+                  activeCard={activeCard}
+                  symbols={snapshot.symbols}
+                  activeSymbol={activeSymbol}
+                  onSelect={setActiveSymbol}
+                  onOpenSymbol={(symbol) => setRoute({ page: "symbol", symbol })}
+                />
+                <div className="split-grid">
+                  <PressureCard activeSymbol={activeSymbol} events={visibleEvents} baseSymbols={snapshot.symbols} />
+                  <TimelineCard rows={timelineRows} />
+                </div>
+                <NarrativeDeck
+                  activeSymbol={activeSymbol}
+                  selectedEvent={selectedEvent}
+                  narratives={snapshot.narratives}
+                />
+                <ReplayFeed
+                  events={symbolEvents}
+                  selectedEventId={selectedEventId}
+                  onSelect={setSelectedEventId}
+                />
+              </div>
+              <aside className="side-column">
+                <RankedAlerts
+                  events={rankedEvents}
+                  activeSymbol={activeSymbol}
+                  selectedEventId={selectedEventId}
+                  onSelect={setSelectedEventId}
+                />
+                <SignalStack activeCard={activeCard} />
+                <InboxCard events={rankedEvents} fallbackItems={snapshot.alertInbox} />
+              </aside>
+            </section>
+          </>
+        ) : null}
+        {route.page === "symbol" ? (
+          <SymbolDetailPage
+            card={activeCard}
+            events={symbolEvents}
+            allSymbols={snapshot.symbols}
+            onSelectSymbol={(symbol) => setRoute({ page: "symbol", symbol })}
+            onBack={() => setRoute({ page: "terminal" })}
+          />
+        ) : null}
+        {route.page === "replay" ? (
+          <ReplayPage
+            rows={timelineRows}
+            groupedEvents={replaySymbols}
+            onOpenSymbol={(symbol) => setRoute({ page: "symbol", symbol })}
+          />
+        ) : null}
       </main>
     </div>
+  );
+}
+
+function TopNav({ route, onNavigate }: { route: Route; onNavigate: (route: Route) => void }) {
+  return (
+    <header className="top-nav">
+      <button type="button" className="brand-mark" onClick={() => onNavigate({ page: "home" })}>
+        DeepSignal
+      </button>
+      <nav className="nav-links">
+        <button type="button" className={isActiveRoute(route, "home")} onClick={() => onNavigate({ page: "home" })}>
+          Home
+        </button>
+        <button type="button" className={isActiveRoute(route, "terminal")} onClick={() => onNavigate({ page: "terminal" })}>
+          Terminal
+        </button>
+        <button type="button" className={isActiveRoute(route, "replay")} onClick={() => onNavigate({ page: "replay" })}>
+          Replay
+        </button>
+      </nav>
+    </header>
+  );
+}
+
+function LandingPage({
+  snapshot,
+  activeCard,
+  onEnterTerminal,
+  onOpenReplay,
+  onOpenSymbol,
+}: {
+  snapshot: TerminalSnapshot;
+  activeCard: SymbolCard;
+  onEnterTerminal: () => void;
+  onOpenReplay: () => void;
+  onOpenSymbol: (symbol: SymbolKey) => void;
+}) {
+  return (
+    <>
+      <section className="launch-hero glass-card">
+        <div className="launch-copy">
+          <span className="eyebrow">Pacifica Market Intelligence</span>
+          <h1>Detect the move before the market explains it.</h1>
+          <p>
+            DeepSignal turns Pacifica whale flow into a product people want to explore: a live
+            control room for oversized trades, narrative acceleration, and ranked conviction.
+          </p>
+          <div className="launch-actions">
+            <button type="button" className="cta-primary" onClick={onEnterTerminal}>
+              Enter Terminal
+            </button>
+            <button type="button" className="cta-secondary" onClick={onOpenReplay}>
+              Open Replay
+            </button>
+          </div>
+          <div className="launch-kpis">
+            {snapshot.kpis.map((item) => (
+              <article key={item.label}>
+                <strong>{item.value}</strong>
+                <span>{item.label}</span>
+              </article>
+            ))}
+          </div>
+        </div>
+        <div className="launch-stage">
+          <div className="stage-panel glass-card">
+            <span className="eyebrow">Current Focus</span>
+            <h2>{activeCard.displayName}</h2>
+            <p>{activeCard.thesis}</p>
+            <div className="stage-metrics">
+              <div><span>Hot Score</span><strong>{activeCard.hotScore.toFixed(1)}</strong></div>
+              <div><span>Attention</span><strong>{activeCard.attention}</strong></div>
+              <div><span>Confidence</span><strong>{activeCard.confidence}</strong></div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section className="launch-ticker glass-card">
+        <span className="eyebrow">Whale Tape</span>
+        <div className="ticker-track">
+          {snapshot.eventFeed.slice(0, 4).map((event) => (
+            <button
+              key={event.id}
+              type="button"
+              className="ticker-pill active"
+              onClick={() => onOpenSymbol(event.symbol)}
+            >
+              <strong>{event.symbol}</strong>
+              <span>{sideLabels[event.side]}</span>
+              <span>${Math.round(event.notionalUsd / 1000)}k</span>
+              <span>{event.score.toFixed(1)}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+      <section className="discover-grid">
+        <article className="discover-card glass-card">
+          <span className="eyebrow">Detect</span>
+          <h3>Large trades surface immediately</h3>
+          <p>Raw Pacifica activity is filtered into qualifying whale flow instead of noisy market tape.</p>
+        </article>
+        <article className="discover-card glass-card">
+          <span className="eyebrow">Rank</span>
+          <h3>Priority rises to the top</h3>
+          <p>Scores combine size, pressure profile, and context so operators see signal before clutter.</p>
+        </article>
+        <article className="discover-card glass-card">
+          <span className="eyebrow">Explain</span>
+          <h3>Narratives make the move legible</h3>
+          <p>ELFA context gives each alert a reason, not just a number.</p>
+        </article>
+        <article className="discover-card glass-card">
+          <span className="eyebrow">Route</span>
+          <h3>Alerts stay usable</h3>
+          <p>Deduplication, cooldowns, and summaries keep operations channels clean.</p>
+        </article>
+      </section>
+      <section className="symbol-gallery">
+        {snapshot.symbols.map((symbol) => (
+          <button
+            key={symbol.symbol}
+            type="button"
+            className="symbol-showcase glass-card"
+            onClick={() => onOpenSymbol(symbol.symbol)}
+          >
+            <div className="symbol-top">
+              <span className="eyebrow">{symbol.symbol}</span>
+              <strong>{symbol.hotScore.toFixed(1)}</strong>
+            </div>
+            <h3>{symbol.displayName}</h3>
+            <p>{symbol.thesis}</p>
+          </button>
+        ))}
+      </section>
+    </>
+  );
+}
+
+function SymbolDetailPage({
+  card,
+  events,
+  allSymbols,
+  onSelectSymbol,
+  onBack,
+}: {
+  card: SymbolCard;
+  events: EventRecord[];
+  allSymbols: SymbolCard[];
+  onSelectSymbol: (symbol: SymbolKey) => void;
+  onBack: () => void;
+}) {
+  const topEvents = [...events].sort((left, right) => right.score - left.score).slice(0, 4);
+  const flow = buildFlowRow(card.symbol, events);
+
+  return (
+    <>
+      <section className="detail-hero glass-card">
+        <div>
+          <span className="eyebrow">Symbol Focus</span>
+          <h1>{card.displayName}</h1>
+          <p>{card.thesis}</p>
+        </div>
+        <button type="button" className="cta-secondary" onClick={onBack}>
+          Back To Terminal
+        </button>
+      </section>
+      <div className="symbol-tabs detail-tabs">
+        {allSymbols.map((symbol) => (
+          <button
+            key={symbol.symbol}
+            type="button"
+            className={symbol.symbol === card.symbol ? "symbol-tab active" : "symbol-tab"}
+            onClick={() => onSelectSymbol(symbol.symbol)}
+          >
+            {symbol.symbol}
+          </button>
+        ))}
+      </div>
+      <section className="detail-grid">
+        <article className="glass-card detail-card">
+          <span className="eyebrow">Profile</span>
+          <h2>Signal profile</h2>
+          <div className="detail-metric-grid">
+            <div><span>Hot Score</span><strong>{card.hotScore.toFixed(1)}</strong></div>
+            <div><span>Attention</span><strong>{card.attention}</strong></div>
+            <div><span>Confidence</span><strong>{card.confidence}</strong></div>
+            <div><span>Direction</span><strong>{card.direction}</strong></div>
+          </div>
+        </article>
+        <article className="glass-card detail-card">
+          <span className="eyebrow">Flow</span>
+          <h2>Net pressure</h2>
+          <p>{card.dominantFlow}</p>
+          <div className="detail-metric-grid">
+            <div><span>Bullish</span><strong>${Math.round(flow.bullish / 1000)}k</strong></div>
+            <div><span>Bearish</span><strong>${Math.round(flow.bearish / 1000)}k</strong></div>
+            <div><span>Events</span><strong>{events.length}</strong></div>
+            <div><span>Signal</span><strong>{events[0]?.signal ?? "n/a"}</strong></div>
+          </div>
+        </article>
+      </section>
+      <section className="detail-grid">
+        <article className="glass-card detail-card">
+          <span className="eyebrow">Highlights</span>
+          <h2>What stands out</h2>
+          <ul className="focus-list">
+            {card.highlights.map((highlight) => <li key={highlight}>{highlight}</li>)}
+          </ul>
+        </article>
+        <article className="glass-card detail-card">
+          <span className="eyebrow">Priority Events</span>
+          <h2>Best alerts</h2>
+          <div className="event-list">
+            {topEvents.map((event) => (
+              <article key={event.id} className="event-item active static-item">
+                <div><strong>{sideLabels[event.side]}</strong><span>{event.signal}</span></div>
+                <div><strong>{event.score.toFixed(1)}</strong><span>${Math.round(event.notionalUsd / 1000)}k</span></div>
+              </article>
+            ))}
+          </div>
+        </article>
+      </section>
+    </>
+  );
+}
+
+function ReplayPage({
+  rows,
+  groupedEvents,
+  onOpenSymbol,
+}: {
+  rows: Array<{ hour: string; notional: number; events: number }>;
+  groupedEvents: Array<{ symbol: SymbolCard; events: EventRecord[] }>;
+  onOpenSymbol: (symbol: SymbolKey) => void;
+}) {
+  return (
+    <>
+      <section className="detail-hero glass-card">
+        <div>
+          <span className="eyebrow">Replay Theater</span>
+          <h1>Walk the sequence, not just the score.</h1>
+          <p>
+            Replay exposes the structure of the move: when activity clustered, which symbols led,
+            and how the tape evolved through the window.
+          </p>
+        </div>
+      </section>
+      <section className="replay-layout">
+        <article className="glass-card detail-card">
+          <span className="eyebrow">Pulse</span>
+          <h2>Hourly flow</h2>
+          <TimelineCard rows={rows} />
+        </article>
+        <article className="glass-card detail-card">
+          <span className="eyebrow">Sequence</span>
+          <h2>Symbol lanes</h2>
+          <div className="lane-list">
+            {groupedEvents.map(({ symbol, events }) => (
+              <button key={symbol.symbol} type="button" className="lane-card" onClick={() => onOpenSymbol(symbol.symbol)}>
+                <div className="lane-top">
+                  <strong>{symbol.symbol}</strong>
+                  <span>{events.length} events</span>
+                </div>
+                <p>{symbol.thesis}</p>
+              </button>
+            ))}
+          </div>
+        </article>
+      </section>
+    </>
   );
 }
 
@@ -424,11 +781,13 @@ function FocusPanel({
   symbols,
   activeSymbol,
   onSelect,
+  onOpenSymbol,
 }: {
   activeCard: SymbolCard;
   symbols: SymbolCard[];
   activeSymbol: SymbolKey;
   onSelect: (symbol: SymbolKey) => void;
+  onOpenSymbol: (symbol: SymbolKey) => void;
 }) {
   return (
     <section className="focus-panel glass-card">
@@ -462,14 +821,27 @@ function FocusPanel({
       <ul className="focus-list">
         {activeCard.highlights.map((highlight) => <li key={highlight}>{highlight}</li>)}
       </ul>
+      <button type="button" className="inline-link" onClick={() => onOpenSymbol(activeCard.symbol)}>
+        Open Symbol Briefing
+      </button>
     </section>
   );
 }
 
-function PressureCard({ activeSymbol, events }: { activeSymbol: SymbolKey; events: EventRecord[] }) {
+function PressureCard({
+  activeSymbol,
+  events,
+  baseSymbols,
+}: {
+  activeSymbol: SymbolKey;
+  events: EventRecord[];
+  baseSymbols: SymbolCard[];
+}) {
   const symbolEvents = events.filter((item) => item.symbol === activeSymbol);
   const row = buildFlowRow(activeSymbol, symbolEvents);
-  const allRows = symbols.map((item) => buildFlowRow(item.symbol, events.filter((event) => event.symbol === item.symbol)));
+  const allRows = activeSymbolUniverse(events, baseSymbols).map((symbol) =>
+    buildFlowRow(symbol, events.filter((event) => event.symbol === symbol)),
+  );
   const maxAbs = Math.max(...allRows.map((item) => Math.abs(item.net)), 1);
   const pct = (Math.abs(row.net) / maxAbs) * 100;
   const positive = row.net >= 0;
@@ -525,7 +897,15 @@ function TimelineCard({ rows }: { rows: Array<{ hour: string; notional: number; 
   );
 }
 
-function NarrativeDeck({ activeSymbol, selectedEvent }: { activeSymbol: SymbolKey; selectedEvent: EventRecord }) {
+function NarrativeDeck({
+  activeSymbol,
+  selectedEvent,
+  narratives,
+}: {
+  activeSymbol: SymbolKey;
+  selectedEvent: EventRecord;
+  narratives: TerminalSnapshot["narratives"];
+}) {
   return (
     <section className="glass-card narrative-deck">
       <div className="panel-head">
@@ -633,13 +1013,19 @@ function SignalStack({ activeCard }: { activeCard: SymbolCard }) {
   );
 }
 
-function InboxCard({ events }: { events: EventRecord[] }) {
+function InboxCard({
+  events,
+  fallbackItems,
+}: {
+  events: EventRecord[];
+  fallbackItems: TerminalSnapshot["alertInbox"];
+}) {
   const operationalItems = events.slice(0, 3).map((event, index) => ({
     title: `${event.symbol} ${sideLabels[event.side]}`,
     state: index === 0 ? "priority" : event.severity,
     note: `${event.signal} at ${event.score.toFixed(1)} score with $${Math.round(event.notionalUsd / 1000)}k notional`,
   }));
-  const items = operationalItems.length > 0 ? operationalItems : alertInbox;
+  const items = operationalItems.length > 0 ? operationalItems : fallbackItems;
 
   return (
     <section className="glass-card inbox-card">
@@ -667,16 +1053,51 @@ function AuroraBackground() {
   );
 }
 
-function getModeEvents(mode: Mode) {
+function parseRoute(pathname: string): Route {
+  if (pathname === "/terminal") {
+    return { page: "terminal" };
+  }
+  if (pathname === "/replay") {
+    return { page: "replay" };
+  }
+  if (pathname.startsWith("/symbol/")) {
+    const symbol = pathname.split("/")[2]?.toUpperCase();
+    if (symbol === "BTC" || symbol === "ETH" || symbol === "SOL") {
+      return { page: "symbol", symbol };
+    }
+  }
+  return { page: "home" };
+}
+
+function useNavigate(onNavigate: (route: Route) => void) {
+  return (route: Route) => {
+    const path =
+      route.page === "home"
+        ? "/"
+        : route.page === "terminal"
+          ? "/terminal"
+          : route.page === "replay"
+            ? "/replay"
+            : `/symbol/${route.symbol.toLowerCase()}`;
+    window.history.pushState({}, "", path);
+    onNavigate(route);
+  };
+}
+
+function isActiveRoute(route: Route, page: Route["page"]) {
+  return route.page === page ? "nav-link active" : "nav-link";
+}
+
+function getModeEvents(mode: Mode, events: EventRecord[]) {
   if (mode === "Replay") {
-    return [...eventFeed].sort((left, right) => left.timestamp.localeCompare(right.timestamp));
+    return [...events].sort((left, right) => left.timestamp.localeCompare(right.timestamp));
   }
 
   if (mode === "Live") {
-    return [...eventFeed].sort((left, right) => right.timestamp.localeCompare(left.timestamp));
+    return [...events].sort((left, right) => right.timestamp.localeCompare(left.timestamp));
   }
 
-  return eventFeed;
+  return events;
 }
 
 function buildFlowRow(symbol: SymbolKey, events: EventRecord[]) {
@@ -695,8 +1116,8 @@ function buildFlowRow(symbol: SymbolKey, events: EventRecord[]) {
   };
 }
 
-function buildActiveCard(symbol: SymbolKey, events: EventRecord[]) {
-  const baseCard = symbols.find((item) => item.symbol === symbol) ?? symbols[0];
+function buildActiveCard(symbol: SymbolKey, events: EventRecord[], baseSymbols: SymbolCard[]) {
+  const baseCard = baseSymbols.find((item) => item.symbol === symbol) ?? baseSymbols[0];
   const symbolEvents = events.filter((event) => event.symbol === symbol);
 
   if (symbolEvents.length === 0) {
@@ -751,7 +1172,7 @@ function buildKpis(events: EventRecord[], note: string) {
 }
 
 function buildTimelineRows(events: EventRecord[], mode: Mode) {
-  const source = events.length > 0 ? events : getModeEvents(mode);
+  const source = events.length > 0 ? events : getModeEvents(mode, fallbackSnapshot.eventFeed);
   const buckets = new Map<string, { notional: number; events: number }>();
 
   for (const event of source) {
@@ -767,6 +1188,14 @@ function buildTimelineRows(events: EventRecord[], mode: Mode) {
     notional: entry.notional,
     events: entry.events,
   }));
+}
+
+function activeSymbolUniverse(events: EventRecord[], baseSymbols: SymbolCard[]) {
+  const symbols = new Set<SymbolKey>(baseSymbols.map((item) => item.symbol));
+  for (const event of events) {
+    symbols.add(event.symbol);
+  }
+  return [...symbols];
 }
 
 export default App;

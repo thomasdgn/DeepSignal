@@ -157,6 +157,25 @@ class DeepSignalStorage:
                 (window_start,),
             ).fetchall()
 
+            terminal_events = connection.execute(
+                """
+                SELECT
+                    symbol,
+                    side,
+                    severity,
+                    ROUND(notional_usd, 2),
+                    ROUND(score, 2),
+                    timestamp_ms,
+                    tags_json,
+                    enrichment_json
+                FROM whale_alerts
+                WHERE timestamp_ms >= ?
+                ORDER BY timestamp_ms DESC, score DESC
+                LIMIT 40
+                """,
+                (window_start,),
+            ).fetchall()
+
             timeline = connection.execute(
                 """
                 SELECT
@@ -350,6 +369,19 @@ class DeepSignalStorage:
                     "enrichment": json.loads(row[8] or "{}"),
                 }
                 for row in ranked_alerts
+            ],
+            "terminal_events": [
+                {
+                    "symbol": row[0],
+                    "side": row[1],
+                    "severity": row[2],
+                    "notional_usd": float(row[3]),
+                    "score": float(row[4]),
+                    "timestamp_ms": int(row[5]),
+                    "tags": json.loads(row[6] or "[]"),
+                    "enrichment": json.loads(row[7] or "{}"),
+                }
+                for row in terminal_events
             ],
             "timeline": [
                 {

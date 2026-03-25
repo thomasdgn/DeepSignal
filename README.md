@@ -232,17 +232,18 @@ This clears stored whale alerts and replaces them with a deterministic demo data
 python -m deepsignal.cli demo-dashboard
 ```
 
-This seeds the deterministic demo dataset and regenerates `reports/dashboard.html` immediately.
+This seeds the deterministic demo dataset, regenerates `reports/dashboard.html`, and exports `frontend/public/terminal-data.json` for the React terminal.
 
 ### 7. Run the frontend terminal
 
 ```bash
+python -m deepsignal.cli dashboard
 cd frontend
 npm install
 npm run dev
 ```
 
-This starts the React/Vite command-center frontend for a more cinematic demo experience.
+`dashboard` refreshes the backend export first. The React/Vite terminal then reads `frontend/public/terminal-data.json` so `Live`, `Replay`, and `Demo` can run on real stored data instead of fallback-only demo data.
 
 ## Recommended Local Workflow
 

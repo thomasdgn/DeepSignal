@@ -8,6 +8,7 @@ from deepsignal.alerting import AlertDispatcher
 from deepsignal.config import Settings
 from deepsignal.demo import build_demo_alerts
 from deepsignal.detection import WhaleDetector
+from deepsignal.frontend_export import render_terminal_payload
 from deepsignal.models import WhaleAlert
 from deepsignal.pacifica import PacificaRestClient, PacificaWebsocketClient
 from deepsignal.reporting import render_dashboard_report
@@ -94,6 +95,12 @@ class DeepSignalApp:
         dashboard_data = self.storage.get_dashboard_data(lookback_hours=lookback_hours)
         report_path = self.settings.reports_dir / "dashboard.html"
         return render_dashboard_report(report_path, dashboard_data)
+
+    def export_terminal_data(self, lookback_hours: int = 24) -> Path:
+        dashboard_data = self.storage.get_dashboard_data(lookback_hours=lookback_hours)
+        frontend_public_dir = Path(__file__).resolve().parents[1] / "frontend" / "public"
+        export_path = frontend_public_dir / "terminal-data.json"
+        return render_terminal_payload(export_path, dashboard_data)
 
     def seed_demo_data(self) -> int:
         demo_alerts = build_demo_alerts(self.settings.whale_notional_usd)

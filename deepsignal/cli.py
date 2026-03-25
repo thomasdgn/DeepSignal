@@ -17,12 +17,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "command",
-        choices=("bootstrap", "monitor", "sync-watchlist", "dashboard", "seed-demo", "demo-dashboard"),
+        choices=(
+            "bootstrap",
+            "monitor",
+            "sync-watchlist",
+            "dashboard",
+            "seed-demo",
+            "demo-dashboard",
+            "export-terminal",
+        ),
         help=(
             "bootstrap prints current Pacifica market context, monitor streams whale alerts, "
             "sync-watchlist stores tracked account snapshots, dashboard generates a local HTML report, "
             "seed-demo writes deterministic demo alerts into the local database, "
-            "demo-dashboard seeds demo data and rebuilds the dashboard in one step"
+            "demo-dashboard seeds demo data and rebuilds the dashboard in one step, "
+            "export-terminal writes frontend/public/terminal-data.json for the React terminal"
         ),
     )
     return parser
@@ -45,7 +54,9 @@ def main() -> None:
 
     if args.command == "dashboard":
         report_path = app.generate_dashboard(lookback_hours=args.lookback_hours)
+        export_path = app.export_terminal_data(lookback_hours=args.lookback_hours)
         print(f"Dashboard generated at {report_path}")
+        print(f"Terminal data exported to {export_path}")
         return
 
     if args.command == "seed-demo":
@@ -55,8 +66,15 @@ def main() -> None:
 
     if args.command == "demo-dashboard":
         seeded, report_path = app.build_demo_dashboard(lookback_hours=args.lookback_hours)
+        export_path = app.export_terminal_data(lookback_hours=args.lookback_hours)
         print(f"Seeded {seeded} demo whale alert(s)")
         print(f"Dashboard generated at {report_path}")
+        print(f"Terminal data exported to {export_path}")
+        return
+
+    if args.command == "export-terminal":
+        export_path = app.export_terminal_data(lookback_hours=args.lookback_hours)
+        print(f"Terminal data exported to {export_path}")
         return
 
     asyncio.run(app.run_trade_monitor())
