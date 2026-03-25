@@ -102,6 +102,11 @@ class DeepSignalApp:
             self.storage.save_whale_alert(alert)
         return len(demo_alerts)
 
+    def build_demo_dashboard(self, lookback_hours: int = 24) -> tuple[int, Path]:
+        seeded = self.seed_demo_data()
+        report_path = self.generate_dashboard(lookback_hours=lookback_hours)
+        return seeded, report_path
+
     def load_watchlist(self) -> list[WatchlistEntry]:
         return load_watchlist(self.settings.watchlist_path)
 

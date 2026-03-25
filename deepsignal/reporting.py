@@ -626,8 +626,8 @@ def _build_html(dashboard_data: dict[str, Any]) -> str:
       <div class="stack">
         <article class="card card-strong">
           <div class="section-title">
-            <h2>Hot Symbols Now</h2>
-            <div class="section-meta">Score + attention + activity</div>
+            <h2>Heat Strip</h2>
+            <div class="section-meta">Visual hot-symbol ranking</div>
           </div>
           <div class="bars">{hot_symbols_chart}</div>
         </article>
@@ -649,7 +649,7 @@ def _build_html(dashboard_data: dict[str, Any]) -> str:
         </article>
         <article class="card card-strong">
           <div class="section-title">
-            <h2>Hot Symbols Now</h2>
+            <h2>Hot Symbols Table</h2>
             <div class="section-meta">Score + attention + activity</div>
           </div>
           <div class="table-wrap">

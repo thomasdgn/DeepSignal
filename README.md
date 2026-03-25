@@ -54,6 +54,7 @@ Main modules:
 - `deepsignal/sponsors/elfa.py`: ELFA enrichment logic
 - `deepsignal/app.py`: orchestration
 - `deepsignal/cli.py`: CLI entrypoint
+- `frontend/`: React/Vite market-intelligence terminal frontend
 
 ## Pacifica Integration
 
@@ -225,6 +226,24 @@ python -m deepsignal.cli seed-demo
 
 This clears stored whale alerts and replaces them with a deterministic demo dataset so you can present the full command center even if live market flow is quiet.
 
+### 6. Build a demo dashboard in one step
+
+```bash
+python -m deepsignal.cli demo-dashboard
+```
+
+This seeds the deterministic demo dataset and regenerates `reports/dashboard.html` immediately.
+
+### 7. Run the frontend terminal
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+This starts the React/Vite command-center frontend for a more cinematic demo experience.
+
 ## Recommended Local Workflow
 
 1. Activate your virtual environment.
@@ -234,6 +253,72 @@ This clears stored whale alerts and replaces them with a deterministic demo data
 5. In another terminal, run `python -m deepsignal.cli dashboard`
 
 If your teammate does the same on their machine, both of you can pull and push safely because local state stays out of the repository.
+
+For demo day, the shortest path is:
+
+1. Activate the virtual environment.
+2. Run `python -m deepsignal.cli demo-dashboard`
+3. Open `reports/dashboard.html`
+
+## Demo Script
+
+Use this flow for a 3 to 5 minute hackathon demo:
+
+1. Start with the problem.
+   Explain that Pacifica traders can see price action, but they still struggle to understand which whale events actually matter and why those moves are happening.
+
+2. Introduce DeepSignal in one sentence.
+   `DeepSignal is a whale-intelligence command center for Pacifica that detects abnormal flow, ranks it by importance, explains the surrounding narrative, and routes only high-signal alerts.`
+
+3. Open the command center.
+   Show `reports/dashboard.html` and start at the top of the page:
+   - operations snapshot
+   - lookback window
+   - total whale notional
+   - highest whale score
+
+4. Show ranked market focus.
+   Walk through:
+   - `Hot Symbols`
+   - `Top Ranked Whale Alerts`
+   - `Top Symbols By Score`
+
+   Explain that this turns raw trade flow into a prioritized market view instead of a noisy event stream.
+
+5. Show directional intelligence.
+   Walk through:
+   - `Directional Pressure Map`
+   - `Directional Flow`
+   - `Pressure Split By Symbol`
+
+   Explain that traders can quickly see whether whales are pressing long or short exposure across the tracked markets.
+
+6. Show the narrative layer.
+   Walk through:
+   - `Narrative Signals`
+   - `Narrative Explainers`
+
+   Explain that ELFA gives context around attention, mentions, and narratives so the user sees not only that a whale moved, but also why the market may be reacting.
+
+7. Show the operational layer.
+   Explain that DeepSignal also supports:
+   - Discord/webhook alerting
+   - score thresholds
+   - deduplication
+   - cooldowns
+   - alert summaries
+
+   This proves the product is not just an analytics page, but something traders could actually run.
+
+8. Close with the value proposition.
+   `DeepSignal helps traders react faster by identifying the most important whale events on Pacifica, ranking their importance, and attaching narrative context before the rest of the market catches up.`
+
+## Demo Tips
+
+- If live market flow is quiet, run `python -m deepsignal.cli demo-dashboard` before presenting.
+- If you want a more active live monitor, temporarily lower `WHALE_NOTIONAL_USD` in `.env`.
+- Keep the story focused on `detect -> rank -> explain -> alert`.
+- Do not spend too much time on implementation details unless judges ask.
 
 ## How To Fill `.env`
 
