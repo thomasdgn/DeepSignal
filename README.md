@@ -93,7 +93,7 @@ Why:
 
 Other sponsors are less relevant for the current scope:
 
-- `Privy`: useful later if you build a user-facing app with wallet login
+- `Privy`: now useful for the frontend app because `Connect` and `Watchlists` support wallet/user identity
 - `Fuul`: useful if you add referrals, campaigns, or distribution loops
 - `Rhino.fi`: only useful if the product expands into cross-chain or bridging flows
 
@@ -178,6 +178,17 @@ Optional:
 
 6. Edit `watchlist.local.json` with the Pacifica account addresses you want to track.
 
+7. If you want Privy enabled in the frontend, create a frontend env file:
+
+```bash
+cp frontend/.env.example frontend/.env
+```
+
+Then fill:
+
+- `VITE_PRIVY_APP_ID`
+- `VITE_PRIVY_CLIENT_ID` (optional but recommended)
+
 ## How To Run
 
 ### 1. Check the base connection
@@ -244,6 +255,8 @@ npm run dev
 ```
 
 `dashboard` refreshes the backend export first. The React/Vite terminal then reads `frontend/public/terminal-data.json` so `Live`, `Replay`, and `Demo` can run on real stored data instead of fallback-only demo data.
+
+If `frontend/.env` contains valid Privy values, the `Connect` and `Watchlists` pages will also expose wallet/login flows.
 
 ## Recommended Local Workflow
 

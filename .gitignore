@@ -11,6 +11,8 @@ build/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/.env
+frontend/.env.local
 frontend/public/terminal-data.json
 frontend/*.tsbuildinfo
 *.pyc
