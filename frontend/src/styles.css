@@ -189,6 +189,7 @@ select {
 .topbar-nav,
 .topbar-actions,
 .action-row,
+.watchlist-actions,
 .mode-tabs,
 .symbol-pills,
 .mini-metrics,
@@ -204,6 +205,7 @@ select {
 .brand-pill,
 .nav-link,
 .chip-button,
+.topbar-profile-chip,
 .button-primary,
 .button-secondary,
 .path-card,
@@ -232,8 +234,23 @@ select {
   font-weight: 800;
 }
 
+.topbar-profile-chip {
+  display: grid;
+  gap: 0.12rem;
+  padding: 0.72rem 0.95rem;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel-card) 92%, transparent);
+}
+
+.topbar-profile-chip span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
 .nav-link,
 .chip-button,
+.mini-chip,
 .button-secondary,
 .symbol-pill,
 .mode-tab {
@@ -257,6 +274,23 @@ select {
   padding: 0.92rem 1.24rem;
   border-radius: 999px;
   font-weight: 700;
+}
+
+.mini-chip {
+  padding: 0.5rem 0.74rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel-card) 94%, transparent);
+  color: var(--soft);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.mini-chip.active {
+  background: var(--accent-gradient);
+  border-color: color-mix(in srgb, var(--accent) 42%, transparent);
+  color: #f8fbff;
+  box-shadow: 0 12px 28px var(--accent-glow);
 }
 
 .eyebrow {
@@ -605,6 +639,8 @@ li {
 .story-grid,
 .signal-lower-grid,
 .watchlists-command-grid,
+.saved-watchlists-grid,
+.profile-summary-grid,
 .watchlists-top-grid,
 .watchlists-board,
 .watchlists-footer,
@@ -627,6 +663,8 @@ li {
 .story-grid,
 .signal-lower-grid,
 .watchlists-command-grid,
+.saved-watchlists-grid,
+.profile-summary-grid,
 .watchlists-top-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -662,7 +700,8 @@ li {
 .inbox-list,
 .discovery-grid,
 .mood-ribbons,
-.pinboard-grid {
+.pinboard-grid,
+.personal-inbox-grid {
   display: grid;
   gap: 0.85rem;
 }
@@ -676,6 +715,8 @@ li {
 .inbox-cluster,
 .watchlists-command-panel,
 .watchlists-preset-panel,
+.saved-watchlist-card,
+.profile-summary-card,
 .path-card,
 .symbol-card,
 .watchlist-column,
@@ -717,6 +758,8 @@ li {
 .discovery-panel,
 .watchlists-command-panel,
 .watchlists-preset-panel,
+.saved-watchlist-card,
+.profile-summary-card,
 .mood-panel,
 .pinboard-panel,
 .narrative-board,
@@ -865,9 +908,13 @@ li {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.personal-inbox-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .filter-bar {
   display: grid;
-  grid-template-columns: minmax(220px, 1.4fr) repeat(3, minmax(140px, 1fr)) auto auto;
+  grid-template-columns: minmax(220px, 1.3fr) repeat(4, minmax(130px, 1fr)) auto auto;
   gap: 0.9rem;
   padding: 1rem;
   align-items: end;
@@ -914,6 +961,21 @@ li {
 .filter-bar input[type="range"] {
   width: 100%;
   accent-color: var(--accent);
+}
+
+.scope-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 1rem 0 0.2rem;
+  padding: 0.72rem 0.95rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel-card) 92%, transparent);
+}
+
+.scope-chip strong {
+  color: var(--ink);
 }
 
 .watchlists-command-body {
@@ -998,13 +1060,48 @@ li {
   margin-bottom: 0.35rem;
 }
 
+.saved-watchlists-grid {
+  align-items: start;
+}
+
+.watchlist-symbol-editor,
+.watchlist-linked-symbols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.watchlist-symbol-chip {
+  padding: 0.72rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel-card) 92%, transparent);
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease;
+}
+
+.watchlist-symbol-chip.active {
+  background: var(--accent-gradient);
+  border-color: color-mix(in srgb, var(--accent) 42%, transparent);
+  color: #f8fbff;
+  box-shadow: 0 16px 30px var(--accent-glow);
+}
+
 .discovery-card,
 .narrative-card,
 .inbox-card,
 .mood-ribbon,
 .pin-card,
 .replay-event-pill,
-.watchlists-user-chip {
+.watchlists-user-chip,
+.profile-mini-grid > div,
+.profile-summary-metrics > div {
   padding: 0.95rem 1rem;
   border-radius: 22px;
   border: 1px solid var(--line);
@@ -1043,8 +1140,34 @@ li {
 }
 
 .watchlists-user-chip span,
-.portal-identity p {
+.portal-identity p,
+.profile-empty-copy {
   color: var(--soft);
+}
+
+.profile-mini-grid,
+.profile-summary-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.profile-mini-grid span,
+.profile-summary-metrics span {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: var(--muted);
+  font-size: 0.74rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.profile-favorites-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
 }
 
 .ticker-row {
@@ -1061,6 +1184,31 @@ li {
   padding: 0.92rem 1rem;
   border-radius: 22px;
   background: color-mix(in srgb, var(--panel-card) 96%, transparent);
+}
+
+.ranked-list__item--interactive {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.ranked-list__main {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ranked-list__actions,
+.pin-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
 }
 
 .ticker-card.active,
@@ -1232,6 +1380,14 @@ li {
   min-height: 130px;
 }
 
+.pin-card__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  align-items: center;
+  margin-bottom: 0.35rem;
+}
+
 .pin-card span {
   color: var(--accent-2);
   font-weight: 700;
@@ -1310,6 +1466,8 @@ li {
   .story-grid,
   .signal-lower-grid,
   .watchlists-command-grid,
+  .saved-watchlists-grid,
+  .profile-summary-grid,
   .watchlists-top-grid,
   .watchlists-board,
   .watchlists-footer,
@@ -1323,7 +1481,9 @@ li {
   }
 
   .filter-bar,
-  .watchlists-command-body {
+  .watchlists-command-body,
+  .profile-mini-grid,
+  .profile-summary-metrics {
     grid-template-columns: 1fr;
   }
 }
@@ -1351,7 +1511,8 @@ li {
   }
 
   .discovery-grid,
-  .pinboard-grid {
+  .pinboard-grid,
+  .personal-inbox-grid {
     grid-template-columns: 1fr;
   }
 

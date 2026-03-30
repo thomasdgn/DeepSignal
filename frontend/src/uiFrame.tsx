@@ -2,6 +2,13 @@ import { AnimatePresence, motion } from "framer-motion";
 import { type ReactNode } from "react";
 import { type AccentTheme, isActiveRoute, type Route, type ThemeMode } from "./uiHelpers";
 
+type TopProfileSummary = {
+  label: string;
+  isAuthenticated: boolean;
+  watchlistCount: number;
+  lastScopeName: string;
+};
+
 export function AppFrame({
   children,
   themeMode,
@@ -24,6 +31,7 @@ export function TopNav({
   onNavigate,
   themeMode,
   accentTheme,
+  profileSummary,
   onToggleTheme,
   onToggleAccent,
 }: {
@@ -31,6 +39,7 @@ export function TopNav({
   onNavigate: (route: Route) => void;
   themeMode: ThemeMode;
   accentTheme: AccentTheme;
+  profileSummary: TopProfileSummary;
   onToggleTheme: () => void;
   onToggleAccent: () => void;
 }) {
@@ -57,6 +66,10 @@ export function TopNav({
         </button>
       </nav>
       <div className="topbar-actions">
+        <div className="topbar-profile-chip">
+          <strong>{profileSummary.label}</strong>
+          <span>{profileSummary.lastScopeName} · {profileSummary.watchlistCount} lists</span>
+        </div>
         <button type="button" className="chip-button" onClick={onToggleAccent}>
           {accentTheme === "blue" ? "Blue" : "Red"}
         </button>

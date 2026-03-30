@@ -13,6 +13,24 @@ import {
 import { type PrivyState } from "./privy";
 import { activeSymbolUniverse, buildFlowRow, sideLabels, type SeverityFilter, type SideFilter } from "./uiHelpers";
 
+type ProfileSummary = {
+  label: string;
+  isAuthenticated: boolean;
+  watchlistCount: number;
+  favoriteSymbols: SymbolKey[];
+  lastScopeName: string;
+  lastScopeUpdatedAt: string;
+  pinnedCount: number;
+  inboxCount: number;
+};
+
+type PersonalInboxItem = {
+  id: string;
+  title: string;
+  state: string;
+  note: string;
+};
+
 export function IntroView({ onEnter }: { onEnter: () => void }) {
   const [ready, setReady] = useState(false);
 
@@ -85,10 +103,12 @@ export function IntroView({ onEnter }: { onEnter: () => void }) {
 
 export function ConnectView({
   privy,
+  profileSummary,
   onContinue,
   onSkip,
 }: {
   privy: PrivyState;
+  profileSummary: ProfileSummary;
   onContinue: () => void;
   onSkip: () => void;
 }) {
@@ -144,6 +164,14 @@ export function ConnectView({
         </article>
       </div>
       <div className="portal-cards">
+        <article className="portal-card portal-card--profile">
+          <strong>Operator profile</strong>
+          <p>{profileSummary.label}</p>
+          <div className="profile-mini-grid">
+            <div><span>Last scope</span><strong>{profileSummary.lastScopeName}</strong></div>
+            <div><span>Watchlists</span><strong>{profileSummary.watchlistCount}</strong></div>
+          </div>
+        </article>
         <article className="portal-card">
           <strong>Privy layer</strong>
           <p>Wallet identity, saved watchlists, custom routes, personal alerts.</p>
@@ -349,16 +377,24 @@ export function TerminalView({
   sideFilter,
   minScore,
   autoRefresh,
+  activeWatchlistId,
+  activeWatchlistName,
+  watchlists,
   alertInbox,
+  pinnedEvents,
   narratives,
+  favoriteSymbols,
   onQueryChange,
   onSeverityChange,
   onSideChange,
   onMinScoreChange,
   onAutoRefreshChange,
+  onActiveWatchlistChange,
   onReset,
   onSelectSymbol,
   onSelectEvent,
+  onTogglePinnedAlert,
+  onAddInboxFromEvent,
   onOpenSymbol,
 }: {
   mode: Mode;
@@ -379,16 +415,24 @@ export function TerminalView({
   sideFilter: SideFilter;
   minScore: number;
   autoRefresh: boolean;
+  activeWatchlistId: string;
+  activeWatchlistName: string;
+  watchlists: Array<{ id: string; name: string }>;
   alertInbox: InboxItem[];
+  pinnedEvents: EventRecord[];
   narratives: NarrativeCard[];
+  favoriteSymbols: SymbolKey[];
   onQueryChange: (value: string) => void;
   onSeverityChange: (value: SeverityFilter) => void;
   onSideChange: (value: SideFilter) => void;
   onMinScoreChange: (value: number) => void;
   onAutoRefreshChange: (value: boolean) => void;
+  onActiveWatchlistChange: (value: string) => void;
   onReset: () => void;
   onSelectSymbol: (symbol: SymbolKey) => void;
   onSelectEvent: (id: string) => void;
+  onTogglePinnedAlert: (id: string) => void;
+  onAddInboxFromEvent: (id: string) => void;
   onOpenSymbol: (symbol: SymbolKey) => void;
 }) {
   const flow = buildFlowRow(activeSymbol, symbolEvents);
@@ -402,6 +446,10 @@ export function TerminalView({
           <span className="eyebrow">Command room</span>
           <h1>{mode === "Replay" ? "Rebuild the wave." : mode === "Live" ? "Watch the ocean move." : "Play with the signal stack."}</h1>
           <p>{activeCard.thesis}</p>
+          <div className="scope-chip">
+            <span className="eyebrow">Scope</span>
+            <strong>{activeWatchlistName}</strong>
+          </div>
           <div className="mode-tabs">
             {modes.map((item) => (
               <button key={item} type="button" className={item === mode ? "mode-tab active" : "mode-tab"} onClick={() => setMode(item)}>
@@ -419,6 +467,15 @@ export function TerminalView({
 
       <section className="filter-bar panel">
         <label><span>Search</span><input type="search" value={query} placeholder="BTC, open long..." onChange={(event) => onQueryChange(event.target.value)} /></label>
+        <label>
+          <span>Watchlist</span>
+          <select value={activeWatchlistId} onChange={(event) => onActiveWatchlistChange(event.target.value)}>
+            <option value="all">All signals</option>
+            {watchlists.map((watchlist) => (
+              <option key={watchlist.id} value={watchlist.id}>{watchlist.name}</option>
+            ))}
+          </select>
+        </label>
         <label>
           <span>Severity</span>
           <select value={severityFilter} onChange={(event) => onSeverityChange(event.target.value as SeverityFilter)}>
@@ -579,10 +636,23 @@ export function TerminalView({
             <h2>Best alerts</h2>
             <div className="ranked-list">
               {rankedEvents.map((event) => (
-                <button key={event.id} type="button" className={event.id === selectedEventId ? "ranked-list__item active" : "ranked-list__item"} onClick={() => onSelectEvent(event.id)}>
-                  <div><strong>{event.symbol}</strong><span>{event.signal}</span></div>
-                  <strong>{event.score.toFixed(1)}</strong>
-                </button>
+                <article key={event.id} className={event.id === selectedEventId ? "ranked-list__item active ranked-list__item--interactive" : "ranked-list__item ranked-list__item--interactive"}>
+                  <button type="button" className="ranked-list__main" onClick={() => onSelectEvent(event.id)}>
+                    <div><strong>{event.symbol}</strong><span>{event.signal}</span></div>
+                    <strong>{event.score.toFixed(1)}</strong>
+                  </button>
+                  <div className="ranked-list__actions">
+                    <button type="button" className={favoriteSymbols.includes(event.symbol) ? "mini-chip active" : "mini-chip"} onClick={() => onSelectSymbol(event.symbol)}>
+                      {favoriteSymbols.includes(event.symbol) ? "Favorite" : "Focus"}
+                    </button>
+                    <button type="button" className={pinnedEvents.some((item) => item.id === event.id) ? "mini-chip active" : "mini-chip"} onClick={() => onTogglePinnedAlert(event.id)}>
+                      {pinnedEvents.some((item) => item.id === event.id) ? "Pinned" : "Pin"}
+                    </button>
+                    <button type="button" className="mini-chip" onClick={() => onAddInboxFromEvent(event.id)}>
+                      Inbox
+                    </button>
+                  </div>
+                </article>
               ))}
             </div>
           </article>
@@ -594,13 +664,41 @@ export function TerminalView({
 
 export function WatchlistsView({
   privy,
+  profileSummary,
   symbols,
   events,
+  savedWatchlists,
+  activeWatchlistId,
+  favoriteSymbols,
+  pinnedEvents,
+  personalInbox,
+  onCreateWatchlist,
+  onToggleWatchlistSymbol,
+  onRemoveWatchlist,
+  onActivateWatchlist,
+  onToggleFavoriteSymbol,
+  onTogglePinnedAlert,
+  onCycleInboxState,
+  onAddInboxFromEvent,
   onOpenSymbol,
 }: {
   privy: PrivyState;
+  profileSummary: ProfileSummary;
   symbols: SymbolCard[];
   events: EventRecord[];
+  savedWatchlists: Array<{ id: string; name: string; description: string; symbols: SymbolKey[] }>;
+  activeWatchlistId: string;
+  favoriteSymbols: SymbolKey[];
+  pinnedEvents: EventRecord[];
+  personalInbox: PersonalInboxItem[];
+  onCreateWatchlist: (name: string, description: string, symbols: SymbolKey[]) => void;
+  onToggleWatchlistSymbol: (watchlistId: string, symbol: SymbolKey) => void;
+  onRemoveWatchlist: (watchlistId: string) => void;
+  onActivateWatchlist: (watchlistId: string) => void;
+  onToggleFavoriteSymbol: (symbol: SymbolKey) => void;
+  onTogglePinnedAlert: (eventId: string) => void;
+  onCycleInboxState: (inboxId: string) => void;
+  onAddInboxFromEvent: (eventId: string) => void;
   onOpenSymbol: (symbol: SymbolKey) => void;
 }) {
   const collections = [
@@ -608,11 +706,11 @@ export function WatchlistsView({
     { title: "Narrative drift", copy: "Names where attention is starting to drag price into a story.", items: [...symbols].sort((a, b) => b.attention - a.attention).slice(0, 3) },
     { title: "Chaotic maybe", copy: "Symbols to keep because they feel interesting, unstable, or just weird.", items: [...symbols].slice(0, 3) },
   ];
-  const pinnedSignals = events.slice(0, 6);
+  const pinnedSignals = pinnedEvents.length > 0 ? pinnedEvents : events.slice(0, 6);
   const savedPresets = [
-    { title: "Momentum room", note: "High-score continuation setups and social confirmation." },
-    { title: "Whale ambush", note: "Large notional bursts that deserve immediate operator review." },
-    { title: "Narrative radar", note: "ELFA-heavy symbols where story and price start syncing." },
+    { title: "Momentum room", note: "High-score continuation setups and social confirmation.", symbols: ["SOL", "BTC"] as SymbolKey[] },
+    { title: "Whale ambush", note: "Large notional bursts that deserve immediate operator review.", symbols: ["BTC", "ETH"] as SymbolKey[] },
+    { title: "Narrative radar", note: "ELFA-heavy symbols where story and price start syncing.", symbols: ["ETH", "SOL"] as SymbolKey[] },
   ];
   const userLabel = useMemo(() => {
     const email = privy.user?.email?.address;
@@ -633,6 +731,75 @@ export function WatchlistsView({
         <h1>Watchlists should feel collectible, personal, and alive.</h1>
         <p>This page is the future anchor for Privy: identity, saved collections, collaborative signal rooms, and a front door tailored to each user.</p>
       </section>
+      <section className="profile-summary-grid">
+        <article className="panel profile-summary-card">
+          <span className="eyebrow">Profile layer</span>
+          <h2>{profileSummary.label}</h2>
+            <div className="profile-summary-metrics">
+              <div><span>Status</span><strong>{profileSummary.isAuthenticated ? "Connected" : "Guest mode"}</strong></div>
+              <div><span>Saved lists</span><strong>{profileSummary.watchlistCount}</strong></div>
+              <div><span>Last scope</span><strong>{profileSummary.lastScopeName}</strong></div>
+              <div><span>Last sync</span><strong>{new Date(profileSummary.lastScopeUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</strong></div>
+              <div><span>Pinned alerts</span><strong>{profileSummary.pinnedCount}</strong></div>
+              <div><span>Personal inbox</span><strong>{profileSummary.inboxCount}</strong></div>
+            </div>
+          </article>
+        <article className="panel profile-summary-card">
+          <span className="eyebrow">Favorite symbols</span>
+          <h2>Current signal habits</h2>
+          <div className="profile-favorites-row">
+            {profileSummary.favoriteSymbols.length > 0 ? (
+              profileSummary.favoriteSymbols.map((symbol) => (
+                <button key={`favorite-${symbol}`} type="button" className="watchlist-symbol-chip active" onClick={() => onOpenSymbol(symbol)}>
+                  {symbol}
+                </button>
+              ))
+            ) : (
+              <span className="profile-empty-copy">Create or edit a watchlist to build favorites.</span>
+            )}
+          </div>
+        </article>
+      </section>
+      <section className="watchlists-top-grid">
+        <article className="panel mood-panel">
+          <span className="eyebrow">Favorite layer</span>
+          <h2>Shape your signal taste</h2>
+          <p className="story-copy">Pick the symbols you want to see again and again. This becomes the quick memory of the product for each operator.</p>
+          <div className="watchlist-symbol-editor">
+            {symbols.map((symbol) => {
+              const active = favoriteSymbols.includes(symbol.symbol);
+              return (
+                <button
+                  key={`favorite-toggle-${symbol.symbol}`}
+                  type="button"
+                  className={active ? "watchlist-symbol-chip active" : "watchlist-symbol-chip"}
+                  onClick={() => onToggleFavoriteSymbol(symbol.symbol)}
+                >
+                  {active ? `Starred ${symbol.symbol}` : `Star ${symbol.symbol}`}
+                </button>
+              );
+            })}
+          </div>
+        </article>
+        <article className="panel pinboard-panel">
+          <span className="eyebrow">Personal inbox</span>
+          <h2>Things you want to keep warm</h2>
+          <div className="personal-inbox-grid">
+            {personalInbox.map((item) => (
+              <article key={item.id} className="inbox-card">
+                <div>
+                  <strong>{item.title}</strong>
+                  <span>{item.state}</span>
+                </div>
+                <p>{item.note}</p>
+                <button type="button" className="mini-chip" onClick={() => onCycleInboxState(item.id)}>
+                  Cycle state
+                </button>
+              </article>
+            ))}
+          </div>
+        </article>
+      </section>
       <section className="watchlists-command-grid">
         <article className="panel watchlists-command-panel">
           <div className="panel-heading">
@@ -641,7 +808,7 @@ export function WatchlistsView({
               <h2>Your signal home</h2>
             </div>
             {privy.authenticated ? (
-              <button type="button" className="button-primary">
+              <button type="button" className="button-primary" onClick={() => onCreateWatchlist("Custom signal room", "A personal watchlist for the current operator.", [symbols[0]?.symbol ?? "BTC"])}>
                 Create watchlist
               </button>
             ) : (
@@ -679,10 +846,64 @@ export function WatchlistsView({
               <article key={preset.title} className="preset-card">
                 <strong>{preset.title}</strong>
                 <p>{preset.note}</p>
+                {privy.authenticated ? (
+                  <button
+                    type="button"
+                    className="button-secondary"
+                    onClick={() => onCreateWatchlist(preset.title, preset.note, preset.symbols)}
+                  >
+                    Add preset
+                  </button>
+                ) : null}
               </article>
             ))}
           </div>
         </article>
+      </section>
+      <section className="saved-watchlists-grid">
+        {savedWatchlists.map((watchlist) => (
+          <article key={watchlist.id} className="panel saved-watchlist-card">
+            <div className="panel-heading">
+              <div>
+                <span className="eyebrow">Saved room</span>
+                <h2>{watchlist.name}</h2>
+              </div>
+              <div className="watchlist-actions">
+                <button type="button" className={activeWatchlistId === watchlist.id ? "button-primary" : "button-secondary"} onClick={() => onActivateWatchlist(watchlist.id)}>
+                  {activeWatchlistId === watchlist.id ? "Active in terminal" : "Focus in terminal"}
+                </button>
+                {privy.authenticated ? (
+                  <button type="button" className="button-secondary" onClick={() => onRemoveWatchlist(watchlist.id)}>
+                    Remove
+                  </button>
+                ) : null}
+              </div>
+            </div>
+            <p>{watchlist.description}</p>
+            <div className="watchlist-symbol-editor">
+              {symbols.map((symbol) => {
+                const active = watchlist.symbols.includes(symbol.symbol);
+                return (
+                  <button
+                    key={`${watchlist.id}-${symbol.symbol}`}
+                    type="button"
+                    className={active ? "watchlist-symbol-chip active" : "watchlist-symbol-chip"}
+                    onClick={() => onToggleWatchlistSymbol(watchlist.id, symbol.symbol)}
+                  >
+                    {symbol.symbol}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="watchlist-linked-symbols">
+              {watchlist.symbols.map((symbol) => (
+                <button key={`${watchlist.id}-link-${symbol}`} type="button" className="stash-card" onClick={() => onOpenSymbol(symbol)}>
+                  <div><strong>{symbol}</strong><span>Open room</span></div>
+                </button>
+              ))}
+            </div>
+          </article>
+        ))}
       </section>
       <section className="watchlists-top-grid">
         <article className="panel mood-panel">
@@ -698,9 +919,19 @@ export function WatchlistsView({
           <div className="pinboard-grid">
             {pinnedSignals.map((event) => (
               <article key={event.id} className="pin-card">
-                <strong>{event.symbol}</strong>
-                <span>{event.score.toFixed(1)}</span>
+                <div className="pin-card__top">
+                  <strong>{event.symbol}</strong>
+                  <span>{event.score.toFixed(1)}</span>
+                </div>
                 <p>{event.narrative}</p>
+                <div className="pin-card__actions">
+                  <button type="button" className="mini-chip" onClick={() => onTogglePinnedAlert(event.id)}>
+                    {pinnedEvents.some((item) => item.id === event.id) ? "Unpin" : "Pin"}
+                  </button>
+                  <button type="button" className="mini-chip" onClick={() => onAddInboxFromEvent(event.id)}>
+                    Send to inbox
+                  </button>
+                </div>
               </article>
             ))}
           </div>
