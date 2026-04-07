@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { fallbackSnapshot, type Mode, type SymbolKey, type TerminalSnapshot } from "./data/demoData";
 import { useDeepSignalPrivy } from "./privy";
 import { AppFrame, AnimatedPage, TopNav, TunnelTransition } from "./uiFrame";
-import { ConnectView, HomeView, IntroView, ReplayView, SymbolView, TerminalView, WatchlistsView } from "./uiViews";
+import { AdvisorView, ConnectView, HomeView, IntroView, ReplayView, SymbolView, TerminalView, WatchlistsView } from "./uiViews";
 import {
   buildActiveCard,
   buildKpis,
@@ -60,6 +60,66 @@ type StoredPersonalSpace = {
   inboxItems?: PersonalInboxItem[];
 };
 
+type AdvisorRiskProfile = "prudent" | "balanced" | "aggressive";
+type AdvisorTimeHorizon = "intraday" | "swing" | "position";
+type AdvisorTradingStyle = "trend" | "narrative" | "scalp";
+
+type StoredAdvisorWorkspace = {
+  selectedProfile?: AdvisorRiskProfile;
+  walletAmount?: number;
+  timeHorizon?: AdvisorTimeHorizon;
+  tradingStyle?: AdvisorTradingStyle;
+  excludedSymbols?: SymbolKey[];
+  updatedAt?: string;
+};
+
+type AdvisorHistoryItem = {
+  id: string;
+  question: string;
+  answer: string;
+  status: string;
+  createdAt: string;
+  discordMessage?: string;
+};
+
+type AdvisorSignal = {
+  symbol: string;
+  side: string;
+  action: string;
+  confidence: string;
+  score: number;
+  severity: string;
+  attention_score: number;
+  thesis: string;
+  risk: string;
+  discord_message: string;
+};
+
+type AdvisorBrief = {
+  generated_at: string;
+  lookback_hours: number;
+  advisor_status: string;
+  elfa_status: string;
+  market_summary: {
+    elfa_status: string;
+    summary_line: string;
+    trending_tokens: string[];
+  };
+  agent_brief?: {
+    status: string;
+    mode: string;
+    summary: string;
+    action_items: string[];
+    caution: string;
+    prompt_basis?: {
+      hot_symbols?: string[];
+      ranked_symbols?: string[];
+    };
+  };
+  signals: AdvisorSignal[];
+  discord_messages: string[];
+};
+
 function buildDefaultWatchlists(symbols: SymbolKey[]): SavedWatchlist[] {
   return [
     {
@@ -108,6 +168,13 @@ function App() {
   const [favoriteSymbols, setFavoriteSymbols] = useState<SymbolKey[]>([]);
   const [pinnedAlertIds, setPinnedAlertIds] = useState<string[]>([]);
   const [personalInbox, setPersonalInbox] = useState<PersonalInboxItem[]>([]);
+  const [advisorBrief, setAdvisorBrief] = useState<AdvisorBrief | null>(null);
+  const [advisorProfile, setAdvisorProfile] = useState<AdvisorRiskProfile>("balanced");
+  const [advisorWalletAmount, setAdvisorWalletAmount] = useState(5000);
+  const [advisorTimeHorizon, setAdvisorTimeHorizon] = useState<AdvisorTimeHorizon>("swing");
+  const [advisorTradingStyle, setAdvisorTradingStyle] = useState<AdvisorTradingStyle>("trend");
+  const [advisorExcludedSymbols, setAdvisorExcludedSymbols] = useState<SymbolKey[]>([]);
+  const [advisorHistory, setAdvisorHistory] = useState<AdvisorHistoryItem[]>([]);
 
   useEffect(() => {
     const storedTheme = window.localStorage.getItem("deepsignal-theme-mode");
@@ -138,7 +205,23 @@ function App() {
       }
     }
 
+    async function loadAdvisorBrief() {
+      try {
+        const response = await fetch("/advisor-brief.json", { cache: "no-store" });
+        if (!response.ok) {
+          return;
+        }
+        const payload = (await response.json()) as AdvisorBrief;
+        if (!cancelled && payload) {
+          setAdvisorBrief(payload);
+        }
+      } catch {
+        // Keep advisor page in fallback mode if export is not present yet.
+      }
+    }
+
     void loadSnapshot();
+    void loadAdvisorBrief();
 
     const handlePopState = () => {
       setRouteState(parseRoute(window.location.pathname));
@@ -493,6 +576,110 @@ function App() {
   }, [favoriteSymbols, personalInbox, pinnedAlertIds, watchlistIdentity]);
 
   useEffect(() => {
+    const storageKey = `deepsignal-advisor:${watchlistIdentity}`;
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) {
+      setAdvisorProfile("balanced");
+      setAdvisorWalletAmount(5000);
+      setAdvisorTimeHorizon("swing");
+      setAdvisorTradingStyle("trend");
+      setAdvisorExcludedSymbols([]);
+      return;
+    }
+    try {
+      const parsed = JSON.parse(raw) as StoredAdvisorWorkspace;
+      if (parsed.selectedProfile === "prudent" || parsed.selectedProfile === "balanced" || parsed.selectedProfile === "aggressive") {
+        setAdvisorProfile(parsed.selectedProfile);
+      }
+      if (typeof parsed.walletAmount === "number" && Number.isFinite(parsed.walletAmount) && parsed.walletAmount > 0) {
+        setAdvisorWalletAmount(parsed.walletAmount);
+      }
+      if (parsed.timeHorizon === "intraday" || parsed.timeHorizon === "swing" || parsed.timeHorizon === "position") {
+        setAdvisorTimeHorizon(parsed.timeHorizon);
+      }
+      if (parsed.tradingStyle === "trend" || parsed.tradingStyle === "narrative" || parsed.tradingStyle === "scalp") {
+        setAdvisorTradingStyle(parsed.tradingStyle);
+      }
+      if (Array.isArray(parsed.excludedSymbols)) {
+        setAdvisorExcludedSymbols(
+          parsed.excludedSymbols.filter((symbol): symbol is SymbolKey => symbol === "BTC" || symbol === "ETH" || symbol === "SOL"),
+        );
+      }
+    } catch {
+      setAdvisorProfile("balanced");
+      setAdvisorWalletAmount(5000);
+      setAdvisorTimeHorizon("swing");
+      setAdvisorTradingStyle("trend");
+      setAdvisorExcludedSymbols([]);
+    }
+  }, [watchlistIdentity]);
+
+  useEffect(() => {
+    const storageKey = `deepsignal-advisor:${watchlistIdentity}`;
+    const payload: StoredAdvisorWorkspace = {
+      selectedProfile: advisorProfile,
+      walletAmount: advisorWalletAmount,
+      timeHorizon: advisorTimeHorizon,
+      tradingStyle: advisorTradingStyle,
+      excludedSymbols: advisorExcludedSymbols,
+      updatedAt: new Date().toISOString(),
+    };
+    window.localStorage.setItem(storageKey, JSON.stringify(payload));
+  }, [
+    advisorExcludedSymbols,
+    advisorHistory,
+    advisorProfile,
+    advisorTimeHorizon,
+    advisorTradingStyle,
+    advisorWalletAmount,
+    watchlistIdentity,
+  ]);
+
+  useEffect(() => {
+    const storageKey = `deepsignal-advisor-history:${watchlistIdentity}`;
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) {
+      setAdvisorHistory([]);
+      return;
+    }
+    try {
+      const parsed = JSON.parse(raw) as AdvisorHistoryItem[];
+      if (!Array.isArray(parsed)) {
+        setAdvisorHistory([]);
+        return;
+      }
+      setAdvisorHistory(
+        parsed.filter(
+          (item): item is AdvisorHistoryItem =>
+            typeof item?.id === "string" &&
+            typeof item?.question === "string" &&
+            typeof item?.answer === "string" &&
+            typeof item?.status === "string" &&
+            typeof item?.createdAt === "string",
+        ),
+      );
+    } catch {
+      setAdvisorHistory([]);
+    }
+  }, [watchlistIdentity]);
+
+  useEffect(() => {
+    const storageKey = `deepsignal-advisor-history:${watchlistIdentity}`;
+    window.localStorage.setItem(storageKey, JSON.stringify(advisorHistory));
+  }, [advisorHistory, watchlistIdentity]);
+
+  function appendAdvisorHistoryItem(item: Omit<AdvisorHistoryItem, "id" | "createdAt">) {
+    setAdvisorHistory((current) => [
+      {
+        id: `advisor-history-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        ...item,
+      },
+      ...current.filter((entry) => entry.question !== item.question).slice(0, 7),
+    ]);
+  }
+
+  useEffect(() => {
     if (activeWatchlistId !== "all" && !savedWatchlists.some((watchlist) => watchlist.id === activeWatchlistId)) {
       setActiveWatchlistId("all");
     }
@@ -629,6 +816,7 @@ function App() {
         {route.page === "intro" ? <AnimatedPage pageKey="intro"><IntroView onEnter={() => setTunnelTarget({ page: "connect" })} /></AnimatedPage> : null}
         {route.page === "connect" ? <AnimatedPage pageKey="connect"><ConnectView privy={privy} profileSummary={profileSummary} onContinue={() => setTunnelTarget({ page: "home" })} onSkip={() => setTunnelTarget({ page: "terminal" })} /></AnimatedPage> : null}
         {route.page === "home" ? <AnimatedPage pageKey="home"><HomeView snapshot={snapshot} activeCard={activeCard} onOpenTerminal={() => navigateTo({ page: "terminal" })} onOpenReplay={() => navigateTo({ page: "replay" })} onOpenWatchlists={() => navigateTo({ page: "watchlists" })} onOpenSymbol={(symbol) => navigateTo({ page: "symbol", symbol })} /></AnimatedPage> : null}
+        {route.page === "advisor" ? <AnimatedPage pageKey="advisor"><AdvisorView brief={advisorBrief} topEvents={rankedEvents} topSymbols={snapshot.symbols} selectedProfile={advisorProfile} walletAmount={advisorWalletAmount} timeHorizon={advisorTimeHorizon} tradingStyle={advisorTradingStyle} excludedSymbols={advisorExcludedSymbols} history={advisorHistory} onSelectedProfileChange={setAdvisorProfile} onWalletAmountChange={setAdvisorWalletAmount} onTimeHorizonChange={setAdvisorTimeHorizon} onTradingStyleChange={setAdvisorTradingStyle} onExcludedSymbolsChange={setAdvisorExcludedSymbols} onHistoryAdd={appendAdvisorHistoryItem} onOpenSymbol={(symbol) => navigateTo({ page: "symbol", symbol })} onOpenTerminal={() => navigateTo({ page: "terminal" })} /></AnimatedPage> : null}
         {route.page === "terminal" ? (
           <AnimatedPage pageKey="terminal">
             <TerminalView

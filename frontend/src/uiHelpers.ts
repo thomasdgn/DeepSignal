@@ -9,6 +9,7 @@ export type Route =
   | { page: "intro" }
   | { page: "connect" }
   | { page: "home" }
+  | { page: "advisor" }
   | { page: "terminal" }
   | { page: "watchlists" }
   | { page: "replay" }
@@ -37,6 +38,9 @@ export function parseRoute(pathname: string): Route {
   if (pathname === "/home") {
     return { page: "home" };
   }
+  if (pathname === "/advisor") {
+    return { page: "advisor" };
+  }
   if (pathname === "/terminal") {
     return { page: "terminal" };
   }
@@ -63,6 +67,8 @@ export function routeToPath(route: Route): string {
       return "/connect";
     case "home":
       return "/home";
+    case "advisor":
+      return "/advisor";
     case "terminal":
       return "/terminal";
     case "watchlists":

@@ -189,6 +189,11 @@ Then fill:
 - `VITE_PRIVY_APP_ID`
 - `VITE_PRIVY_CLIENT_ID` (optional but recommended)
 
+Important:
+
+- `frontend/.env` is local only and should not be committed
+- after creating or editing `frontend/.env`, restart `npm run dev` because Vite reads env vars at startup
+
 ## How To Run
 
 ### 1. Check the base connection
@@ -249,12 +254,15 @@ This seeds the deterministic demo dataset, regenerates `reports/dashboard.html`,
 
 ```bash
 python -m deepsignal.cli dashboard
+python -m deepsignal.cli serve-api
 cd frontend
 npm install
 npm run dev
 ```
 
 `dashboard` refreshes the backend export first. The React/Vite terminal then reads `frontend/public/terminal-data.json` so `Live`, `Replay`, and `Demo` can run on real stored data instead of fallback-only demo data.
+
+`serve-api` starts the local backend endpoint used by the `Ask ELFA advisor` button on the Advisor page. In development, Vite proxies `/api/*` to `http://127.0.0.1:8765`.
 
 If `frontend/.env` contains valid Privy values, the `Connect` and `Watchlists` pages will also expose wallet/login flows.
 

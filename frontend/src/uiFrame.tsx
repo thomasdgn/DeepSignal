@@ -52,6 +52,9 @@ export function TopNav({
         <button type="button" className={isActiveRoute(route, "home")} onClick={() => onNavigate({ page: "home" })}>
           Home
         </button>
+        <button type="button" className={isActiveRoute(route, "advisor")} onClick={() => onNavigate({ page: "advisor" })}>
+          Advisor
+        </button>
         <button type="button" className={isActiveRoute(route, "connect")} onClick={() => onNavigate({ page: "connect" })}>
           Connect
         </button>

@@ -276,6 +276,13 @@ select {
   font-weight: 700;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+  transform: none;
+  box-shadow: none;
+}
+
 .mini-chip {
   padding: 0.5rem 0.74rem;
   border-radius: 999px;
@@ -625,6 +632,7 @@ li {
 
 .connect-view,
 .home-hero,
+.advisor-hero,
 .terminal-hero,
 .watchlists-hero,
 .replay-hero,
@@ -655,8 +663,236 @@ li {
 
 .connect-view,
 .home-hero,
+.advisor-hero,
 .terminal-hero {
   grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+}
+
+.advisor-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+  gap: 1rem;
+}
+
+.advisor-side,
+.advisor-signal-list,
+.advisor-discord-list {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.advisor-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin: 1rem 0;
+}
+
+.advisor-controls label,
+.advisor-exclusions {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.advisor-controls span,
+.advisor-exclusions > .eyebrow {
+  justify-self: start;
+}
+
+.advisor-controls input,
+.advisor-controls select {
+  width: 100%;
+  padding: 0.88rem 0.98rem;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  outline: none;
+  color: var(--ink);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-card-strong) 92%, transparent), color-mix(in srgb, var(--panel-card) 92%, transparent));
+}
+
+.advisor-controls input:focus,
+.advisor-controls select:focus {
+  border-color: color-mix(in srgb, var(--accent) 44%, transparent);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.advisor-profile-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin: 1rem 0 1.1rem;
+}
+
+.advisor-signals-panel,
+.advisor-trend-panel,
+.advisor-discord-panel,
+.advisor-agent-panel {
+  padding: 1.25rem;
+  border-radius: 28px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel-card-strong) 94%, transparent);
+}
+
+.advisor-agent-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.advisor-chat-box {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.advisor-prompt-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.advisor-chat-box textarea {
+  min-height: 110px;
+  resize: vertical;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel-card) 94%, transparent);
+  color: var(--text);
+  padding: 0.95rem 1rem;
+  font: inherit;
+}
+
+.advisor-chat-box textarea:focus {
+  outline: none;
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-strong) 20%, transparent);
+}
+
+.advisor-history-panel {
+  padding: 1.1rem;
+  border-radius: 24px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel-card) 94%, transparent);
+}
+
+.advisor-history-list {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.advisor-history-card {
+  text-align: left;
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.95rem 1rem;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel-card-strong) 92%, transparent);
+  color: var(--text);
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.advisor-history-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-strong);
+}
+
+.advisor-history-card__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  align-items: baseline;
+}
+
+.advisor-history-card__top span {
+  color: var(--text-soft);
+  font-size: 0.78rem;
+}
+
+.advisor-history-card__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.advisor-history-card p {
+  margin: 0;
+  color: var(--text-soft);
+  line-height: 1.45;
+}
+
+.advisor-hero {
+  padding: 1.6rem;
+}
+
+.advisor-hero__meta {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.advisor-meta-card,
+.advisor-profile-card,
+.advisor-signal-card,
+.advisor-discord-card {
+  padding: 1rem;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel-card) 94%, transparent);
+}
+
+.advisor-meta-card span,
+.advisor-profile-card span,
+.advisor-signal-metrics span {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--muted);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.advisor-meta-card strong {
+  color: var(--ink);
+  font-size: 1.25rem;
+}
+
+.advisor-profile-card strong {
+  color: var(--ink);
+  line-height: 1.4;
+}
+
+.advisor-signal-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.advisor-risk-copy {
+  color: var(--soft);
+  font-style: italic;
+}
+
+.advisor-signal-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin: 0.9rem 0 0.35rem;
+}
+
+.advisor-discord-card p {
+  margin: 0;
+  color: var(--soft);
+  line-height: 1.7;
+}
+
+.advisor-discord-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.8rem;
 }
 
 .exploration-deck,
@@ -1460,7 +1696,9 @@ li {
   .intro-view,
   .connect-view,
   .home-hero,
+  .advisor-hero,
   .terminal-hero,
+  .advisor-grid,
   .terminal-layout,
   .exploration-deck,
   .story-grid,
@@ -1513,6 +1751,18 @@ li {
   .discovery-grid,
   .pinboard-grid,
   .personal-inbox-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .advisor-signal-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .advisor-profile-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .advisor-controls {
     grid-template-columns: 1fr;
   }
 

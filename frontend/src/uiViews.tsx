@@ -31,6 +31,15 @@ type PersonalInboxItem = {
   note: string;
 };
 
+type AdvisorHistoryItem = {
+  id: string;
+  question: string;
+  answer: string;
+  status: string;
+  createdAt: string;
+  discordMessage?: string;
+};
+
 export function IntroView({ onEnter }: { onEnter: () => void }) {
   const [ready, setReady] = useState(false);
 
@@ -141,13 +150,13 @@ export function ConnectView({
                 Continue as connected user
               </button>
             ) : (
-              <button type="button" className="button-primary" onClick={() => void privy.login()}>
+              <button type="button" className="button-primary" disabled={!privy.ready} onClick={() => void privy.login()}>
                 Connect with Privy
               </button>
             )
           ) : (
-            <button type="button" className="button-primary" onClick={onContinue}>
-              Enter home
+            <button type="button" className="button-primary" disabled>
+              Privy not configured
             </button>
           )}
           <button type="button" className="button-secondary" onClick={onContinue}>
@@ -159,8 +168,9 @@ export function ConnectView({
         </div>
         <article className="portal-identity">
           <span className="eyebrow">Identity state</span>
-          <strong>{privy.authenticated ? "Connected" : privy.isConfigured ? "Ready to connect" : "Privy not configured yet"}</strong>
+          <strong>{privy.authenticated ? "Connected" : privy.status === "initializing" ? "Privy is initializing" : privy.isConfigured ? "Ready to connect" : "Privy not configured yet"}</strong>
           <p>{accountLabel}</p>
+          <p>{privy.message}</p>
         </article>
       </div>
       <div className="portal-cards">
@@ -356,6 +366,634 @@ export function HomeView({
       </section>
     </>
   );
+}
+
+export function AdvisorView({
+  brief,
+  topEvents,
+  topSymbols,
+  selectedProfile,
+  walletAmount,
+  timeHorizon,
+  tradingStyle,
+  excludedSymbols,
+  history,
+  onSelectedProfileChange,
+  onWalletAmountChange,
+  onTimeHorizonChange,
+  onTradingStyleChange,
+  onExcludedSymbolsChange,
+  onHistoryAdd,
+  onOpenSymbol,
+  onOpenTerminal,
+}: {
+  brief: {
+    generated_at: string;
+    lookback_hours: number;
+    advisor_status: string;
+    elfa_status: string;
+    market_summary: {
+      elfa_status: string;
+      summary_line: string;
+      trending_tokens: string[];
+    };
+    agent_brief?: {
+      status: string;
+      mode: string;
+      summary: string;
+      action_items: string[];
+      caution: string;
+      prompt_basis?: {
+        hot_symbols?: string[];
+        ranked_symbols?: string[];
+      };
+    };
+    default_profile?: string;
+    profiles?: Record<string, {
+      label: string;
+      entry_bias: string;
+      size_hint: string;
+      watch_bias: string;
+      discord_tone: string;
+      signals: Array<{
+        profile: string;
+        symbol: string;
+        side: string;
+        action: string;
+        confidence: string;
+        score: number;
+        severity: string;
+        attention_score: number;
+        allocation_hint: string;
+        entry_style: string;
+        thesis: string;
+        risk: string;
+        discord_message: string;
+      }>;
+      discord_messages: string[];
+    }>;
+    signals: Array<{
+      profile?: string;
+      symbol: string;
+      side: string;
+      action: string;
+      confidence: string;
+      score: number;
+      severity: string;
+      attention_score: number;
+      allocation_hint?: string;
+      entry_style?: string;
+      thesis: string;
+      risk: string;
+      discord_message: string;
+    }>;
+    discord_messages: string[];
+  } | null;
+  topEvents: EventRecord[];
+  topSymbols: SymbolCard[];
+  selectedProfile: "prudent" | "balanced" | "aggressive";
+  walletAmount: number;
+  timeHorizon: "intraday" | "swing" | "position";
+  tradingStyle: "trend" | "narrative" | "scalp";
+  excludedSymbols: SymbolKey[];
+  history: AdvisorHistoryItem[];
+  onSelectedProfileChange: (profile: "prudent" | "balanced" | "aggressive") => void;
+  onWalletAmountChange: (amount: number) => void;
+  onTimeHorizonChange: (horizon: "intraday" | "swing" | "position") => void;
+  onTradingStyleChange: (style: "trend" | "narrative" | "scalp") => void;
+  onExcludedSymbolsChange: (symbols: SymbolKey[]) => void;
+  onHistoryAdd: (item: Omit<AdvisorHistoryItem, "id" | "createdAt">) => void;
+  onOpenSymbol: (symbol: SymbolKey) => void;
+  onOpenTerminal: () => void;
+}) {
+  const [agentQuestion, setAgentQuestion] = useState("Which trend should I focus on for the next move?");
+  const [agentAnswer, setAgentAnswer] = useState<string | null>(brief?.agent_brief?.summary ?? null);
+  const [agentDiscordMessage, setAgentDiscordMessage] = useState<string | null>(null);
+  const [agentStatus, setAgentStatus] = useState<string | null>(brief?.agent_brief?.status ?? null);
+  const [agentError, setAgentError] = useState<string | null>(null);
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [discordSendState, setDiscordSendState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const quickPrompts = [
+    "Which trend should I focus on for the next move?",
+    "Is SOL too crowded to chase right now?",
+    "Which symbol has the cleanest narrative confirmation?",
+    "Should I wait for confirmation or scale in now?",
+  ];
+
+  const fallbackSignals = topEvents.slice(0, 3).map((event) => ({
+    profile: "balanced",
+    symbol: event.symbol,
+    side: event.side,
+    action: event.side === "open_long" || event.side === "close_short" ? "bias long" : "watch for entry",
+    confidence: event.score >= 85 ? "high" : "medium",
+    score: event.score,
+    severity: event.severity,
+    attention_score: event.signal === "high-attention" ? 95 : event.signal === "rising-attention" ? 74 : 44,
+    allocation_hint: "3 to 6% tactical size",
+    entry_style: "split entry between breakout and retest",
+    thesis: event.narrative,
+    risk: "Use confirmation and position sizing before entering.",
+    discord_message: `DeepSignal Advisor | ${event.symbol} | ${event.side} | score=${event.score.toFixed(1)} | ${event.narrative}`,
+  }));
+  const selectedPlan = brief?.profiles?.[selectedProfile];
+  const baseSignals = selectedPlan?.signals?.length ? selectedPlan.signals : brief?.signals?.length ? brief.signals : fallbackSignals;
+  const filteredSignals = baseSignals.filter((signal) => !excludedSymbols.includes(signal.symbol as SymbolKey));
+  const personalizedSignals = filteredSignals.map((signal, index) => {
+    const suggestedPercent = resolveAllocationPercent(selectedProfile, signal.confidence, signal.action, index);
+    const styleMultiplier =
+      tradingStyle === "scalp" ? 0.75 : tradingStyle === "narrative" ? 1.1 : 1;
+    const horizonMultiplier =
+      timeHorizon === "intraday" ? 0.7 : timeHorizon === "position" ? 1.2 : 1;
+    const allocationPercent = Number(Math.max(0.5, suggestedPercent * styleMultiplier * horizonMultiplier).toFixed(1));
+    const allocationUsd = Number(((walletAmount * allocationPercent) / 100).toFixed(2));
+    return {
+      ...signal,
+      allocation_percent: allocationPercent,
+      allocation_usd: allocationUsd,
+      execution_note: buildExecutionNote(timeHorizon, tradingStyle, signal.action),
+    };
+  });
+  const totalAllocatedUsd = personalizedSignals.reduce((total, signal) => total + signal.allocation_usd, 0);
+  const discordMessages = selectedPlan?.discord_messages?.length
+    ? selectedPlan.discord_messages
+    : brief?.discord_messages?.length
+      ? brief.discord_messages
+      : fallbackSignals.map((signal) => signal.discord_message);
+  const personalizedDiscordMessages = personalizedSignals.map(
+    (signal) =>
+      `DeepSignal Advisor | ${selectedProfile.toUpperCase()} | ${signal.symbol} | ${signal.action.toUpperCase()} | wallet=$${walletAmount.toLocaleString()} | size=$${signal.allocation_usd.toLocaleString()} (${signal.allocation_percent}%) | ${signal.execution_note}`,
+  );
+  const trendingTokens = brief?.market_summary?.trending_tokens?.length
+    ? brief.market_summary.trending_tokens
+    : topSymbols.slice(0, 3).map((symbol) => symbol.symbol);
+  const summaryLine = brief?.market_summary?.summary_line
+    ?? "Advisor brief not exported yet. Run `python -m deepsignal.cli advisor` to feed this page with backend recommendations.";
+  const activeDiscordMessages = personalizedDiscordMessages.length > 0 ? personalizedDiscordMessages : discordMessages;
+  const agentBrief = brief?.agent_brief;
+
+  useEffect(() => {
+    if (agentBrief?.summary) {
+      setAgentAnswer(agentBrief.summary);
+      setAgentStatus(agentBrief.status);
+    }
+  }, [agentBrief?.status, agentBrief?.summary]);
+
+  async function askAdvisor() {
+    const question = agentQuestion.trim();
+    if (!question) {
+      setAgentError("Write a question first so the advisor has something to answer.");
+      return;
+    }
+
+    setAgentLoading(true);
+    setAgentError(null);
+
+    try {
+      const response = await fetch("/api/advisor-chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          question,
+          lookback_hours: 24,
+        }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.details || payload?.error || "advisor request failed");
+      }
+
+      const nextDiscordMessage = formatDiscordAdvisorMessage({
+        question,
+        answer: payload.answer ?? "No answer returned.",
+        profile: selectedProfile,
+        walletAmount,
+        timeHorizon,
+        tradingStyle,
+        status: payload.status ?? "live",
+      });
+
+      setAgentAnswer(payload.answer ?? null);
+      setAgentDiscordMessage(nextDiscordMessage);
+      setAgentStatus(payload.status ?? "live");
+      onHistoryAdd({
+        question,
+        answer: payload.answer ?? "No answer returned.",
+        status: payload.status ?? "live",
+        discordMessage: nextDiscordMessage,
+      });
+    } catch (error) {
+      setAgentError(
+        "Advisor chat is unavailable right now. Start `python -m deepsignal.cli serve-api` and try again.",
+      );
+      if (error instanceof Error) {
+        setAgentStatus(`error: ${error.message}`);
+      }
+    } finally {
+      setAgentLoading(false);
+    }
+  }
+
+  async function sendCurrentMessageToDiscord() {
+    const message = agentDiscordMessage?.trim();
+    if (!message) {
+      setAgentError("No Discord-ready advisor message is available yet.");
+      return;
+    }
+
+    setDiscordSendState("sending");
+    setAgentError(null);
+
+    try {
+      const response = await fetch("/api/advisor-discord", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ message }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.details || payload?.error || "discord delivery failed");
+      }
+      setDiscordSendState("sent");
+    } catch (error) {
+      setDiscordSendState("error");
+      setAgentError(
+        "Discord delivery failed. Check DISCORD_WEBHOOK_URL and make sure `python -m deepsignal.cli serve-api` is running.",
+      );
+      if (error instanceof Error) {
+        setAgentStatus(`error: ${error.message}`);
+      }
+    }
+  }
+
+  async function sendHistoryItemToDiscord(item: AdvisorHistoryItem) {
+    const message =
+      item.discordMessage ??
+      formatDiscordAdvisorMessage({
+        question: item.question,
+        answer: item.answer,
+        profile: selectedProfile,
+        walletAmount,
+        timeHorizon,
+        tradingStyle,
+        status: item.status,
+      });
+
+    setDiscordSendState("sending");
+    setAgentError(null);
+
+    try {
+      const response = await fetch("/api/advisor-discord", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ message }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.details || payload?.error || "discord delivery failed");
+      }
+      setAgentDiscordMessage(message);
+      setDiscordSendState("sent");
+    } catch (error) {
+      setDiscordSendState("error");
+      setAgentError(
+        "Discord delivery failed. Check DISCORD_WEBHOOK_URL and make sure `python -m deepsignal.cli serve-api` is running.",
+      );
+      if (error instanceof Error) {
+        setAgentStatus(`error: ${error.message}`);
+      }
+    }
+  }
+
+  return (
+    <>
+      <section className="advisor-hero panel">
+        <div className="advisor-hero__copy">
+          <span className="eyebrow">Advisor room</span>
+          <h1>Let the backend turn flow into a plan.</h1>
+          <p>{summaryLine}</p>
+          <div className="action-row">
+            <button type="button" className="button-primary" onClick={onOpenTerminal}>
+              Open terminal
+            </button>
+          </div>
+          <div className="mode-tabs">
+            {["prudent", "balanced", "aggressive"].map((profile) => (
+              <button
+                key={profile}
+                type="button"
+                className={selectedProfile === profile ? "mode-tab active" : "mode-tab"}
+                onClick={() => onSelectedProfileChange(profile as "prudent" | "balanced" | "aggressive")}
+              >
+                {profile}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="advisor-hero__meta">
+          <article className="advisor-meta-card">
+            <span>Status</span>
+            <strong>{brief?.advisor_status ?? "fallback"}</strong>
+          </article>
+          <article className="advisor-meta-card">
+            <span>ELFA</span>
+            <strong>{brief?.elfa_status ?? "local"}</strong>
+          </article>
+          <article className="advisor-meta-card">
+            <span>Profile</span>
+            <strong>{selectedPlan?.label ?? "Balanced"}</strong>
+          </article>
+          <article className="advisor-meta-card">
+            <span>Window</span>
+            <strong>{brief?.lookback_hours ?? 24}h</strong>
+          </article>
+          <article className="advisor-meta-card">
+            <span>Planned size</span>
+            <strong>${totalAllocatedUsd.toLocaleString()}</strong>
+          </article>
+        </div>
+      </section>
+
+      <section className="advisor-grid">
+        <article className="panel advisor-signals-panel">
+          <span className="eyebrow">Signals</span>
+          <h2>Recommended plays</h2>
+          <div className="advisor-controls">
+            <label>
+              <span>Wallet</span>
+              <input
+                type="number"
+                min={100}
+                step={100}
+                value={walletAmount}
+                onChange={(event) => onWalletAmountChange(Math.max(100, Number(event.target.value) || 100))}
+              />
+            </label>
+            <label>
+              <span>Horizon</span>
+              <select value={timeHorizon} onChange={(event) => onTimeHorizonChange(event.target.value as "intraday" | "swing" | "position")}>
+                <option value="intraday">Intraday</option>
+                <option value="swing">Swing</option>
+                <option value="position">Position</option>
+              </select>
+            </label>
+            <label>
+              <span>Style</span>
+              <select value={tradingStyle} onChange={(event) => onTradingStyleChange(event.target.value as "trend" | "narrative" | "scalp")}>
+                <option value="trend">Trend</option>
+                <option value="narrative">Narrative</option>
+                <option value="scalp">Scalp</option>
+              </select>
+            </label>
+          </div>
+          <div className="advisor-exclusions">
+            <span className="eyebrow">Exclude symbols</span>
+            <div className="profile-favorites-row">
+              {(["BTC", "ETH", "SOL"] as SymbolKey[]).map((symbol) => (
+                <button
+                  key={`exclude-${symbol}`}
+                  type="button"
+                  className={excludedSymbols.includes(symbol) ? "watchlist-symbol-chip" : "watchlist-symbol-chip active"}
+                  onClick={() =>
+                    onExcludedSymbolsChange(
+                      excludedSymbols.includes(symbol)
+                        ? excludedSymbols.filter((item) => item !== symbol)
+                        : [...excludedSymbols, symbol],
+                    )
+                  }
+                >
+                  {excludedSymbols.includes(symbol) ? `Excluded ${symbol}` : symbol}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="advisor-profile-summary">
+            <article className="advisor-profile-card">
+              <span>Entry bias</span>
+              <strong>{selectedPlan?.entry_bias ?? "scale in on confirmation"}</strong>
+            </article>
+            <article className="advisor-profile-card">
+              <span>Size hint</span>
+              <strong>{selectedPlan?.size_hint ?? "3 to 6% tactical size"}</strong>
+            </article>
+            <article className="advisor-profile-card">
+              <span>Watch bias</span>
+              <strong>{selectedPlan?.watch_bias ?? "watch for entry on clean continuation"}</strong>
+            </article>
+          </div>
+          <div className="advisor-signal-list">
+            {personalizedSignals.map((signal) => (
+              <article key={`${signal.symbol}-${signal.side}-${signal.score}`} className="advisor-signal-card">
+                <div className="panel-heading">
+                  <div>
+                    <span className="eyebrow">{signal.symbol}</span>
+                    <h3>{signal.action}</h3>
+                  </div>
+                  <button type="button" className="mini-chip active" onClick={() => onOpenSymbol(signal.symbol as SymbolKey)}>
+                    Open room
+                  </button>
+                </div>
+                <div className="advisor-signal-metrics">
+                  <div><span>Score</span><strong>{signal.score.toFixed(1)}</strong></div>
+                  <div><span>Attention</span><strong>{signal.attention_score.toFixed(0)}</strong></div>
+                  <div><span>Confidence</span><strong>{signal.confidence}</strong></div>
+                  <div><span>Severity</span><strong>{signal.severity}</strong></div>
+                </div>
+                <div className="advisor-signal-metrics">
+                  <div><span>Size %</span><strong>{signal.allocation_percent}%</strong></div>
+                  <div><span>Wallet size</span><strong>${signal.allocation_usd.toLocaleString()}</strong></div>
+                  <div><span>Horizon</span><strong>{timeHorizon}</strong></div>
+                  <div><span>Style</span><strong>{tradingStyle}</strong></div>
+                </div>
+                <p>{signal.thesis}</p>
+                <div className="advisor-signal-footer">
+                  <span className="signal-pill">{signal.entry_style ?? "split entry between breakout and retest"}</span>
+                  <span className="signal-pill">{signal.allocation_hint ?? "3 to 6% tactical size"}</span>
+                </div>
+                <p className="story-copy">{signal.execution_note}</p>
+                <p className="advisor-risk-copy">Risk: {signal.risk}</p>
+              </article>
+            ))}
+            {personalizedSignals.length === 0 ? (
+              <article className="advisor-signal-card">
+                <h3>No symbols left in scope</h3>
+                <p>All tracked symbols are excluded right now. Re-enable at least one to generate a plan.</p>
+              </article>
+            ) : null}
+          </div>
+        </article>
+
+        <aside className="advisor-side">
+          <article className="panel advisor-agent-panel">
+            <span className="eyebrow">ELFA agent layer</span>
+            <h2>What the advisor sees</h2>
+            <div className="advisor-chat-box">
+              <textarea
+                value={agentQuestion}
+                onChange={(event) => setAgentQuestion(event.target.value)}
+                placeholder="Ask ELFA advisor what trend deserves attention, whether a move is crowded, or how to approach an entry."
+              />
+              <div className="advisor-prompt-row">
+                {quickPrompts.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    className="mini-chip"
+                    onClick={() => setAgentQuestion(prompt)}
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+              <button type="button" className="button-primary" onClick={() => void askAdvisor()} disabled={agentLoading}>
+                {agentLoading ? "Asking ELFA..." : "Ask ELFA advisor"}
+              </button>
+            </div>
+            <article className="advisor-discord-card">
+              <p>{agentAnswer ?? agentBrief?.summary ?? "Run the advisor export to generate an ELFA agent summary for this market window."}</p>
+            </article>
+            <div className="advisor-agent-meta">
+              <span className="signal-pill">{agentStatus ?? agentBrief?.status ?? "pending"}</span>
+              <span className="signal-pill">{agentBrief?.mode ?? "summary"}</span>
+            </div>
+            {agentError ? <p className="advisor-risk-copy">Note: {agentError}</p> : null}
+            <ul className="insight-list">
+              {(agentBrief?.action_items ?? []).map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+            {agentBrief?.caution ? <p className="advisor-risk-copy">Caution: {agentBrief.caution}</p> : null}
+            {agentDiscordMessage ? (
+              <article className="advisor-discord-card">
+                <p>{agentDiscordMessage}</p>
+                <div className="advisor-discord-actions">
+                  <button
+                    type="button"
+                    className="button-secondary"
+                    onClick={() => void sendCurrentMessageToDiscord()}
+                    disabled={discordSendState === "sending"}
+                  >
+                    {discordSendState === "sending"
+                      ? "Sending..."
+                      : discordSendState === "sent"
+                        ? "Sent to Discord"
+                        : "Send to Discord"}
+                  </button>
+                </div>
+              </article>
+            ) : null}
+            <article className="panel advisor-history-panel">
+              <span className="eyebrow">History</span>
+              <h2>Recent advisor prompts</h2>
+              <div className="advisor-history-list">
+                {history.length > 0 ? (
+                  history.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="advisor-history-card"
+                      onClick={() => {
+                        setAgentQuestion(item.question);
+                        setAgentAnswer(item.answer);
+                        setAgentDiscordMessage(item.discordMessage ?? null);
+                        setAgentStatus(item.status);
+                        setAgentError(null);
+                      }}
+                    >
+                      <div className="advisor-history-card__top">
+                        <strong>{item.question}</strong>
+                        <span>{new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                      </div>
+                      <p>{item.answer}</p>
+                      <div className="advisor-history-card__actions">
+                        <span className="signal-pill">{item.status}</span>
+                        <button
+                          type="button"
+                          className="mini-chip active"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void sendHistoryItemToDiscord(item);
+                          }}
+                        >
+                          Send to Discord
+                        </button>
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <article className="advisor-discord-card">
+                    <p>Your advisor history will appear here after the first question.</p>
+                  </article>
+                )}
+              </div>
+            </article>
+          </article>
+          <article className="panel advisor-trend-panel">
+            <span className="eyebrow">Trend map</span>
+            <h2>ELFA context</h2>
+            <div className="profile-favorites-row">
+              {trendingTokens.map((token) => (
+                <span key={token} className="watchlist-symbol-chip active">{token}</span>
+              ))}
+            </div>
+          </article>
+          <article className="panel advisor-discord-panel">
+            <span className="eyebrow">Discord feed</span>
+            <h2>Messages ready to post</h2>
+            <div className="advisor-discord-list">
+              {activeDiscordMessages.map((message, index) => (
+                <article key={`discord-${index}`} className="advisor-discord-card">
+                  <p>{message}</p>
+                </article>
+              ))}
+            </div>
+          </article>
+        </aside>
+      </section>
+    </>
+  );
+}
+
+function resolveAllocationPercent(
+  profile: string,
+  confidence: string,
+  action: string,
+  index: number,
+): number {
+  const baseByProfile: Record<string, number> = {
+    prudent: 1.8,
+    balanced: 4,
+    aggressive: 7,
+  };
+  const confidenceBonus =
+    confidence === "high" ? 1.5 : confidence === "medium" ? 0.5 : -0.5;
+  const actionBonus =
+    action.includes("bias") ? 1.2 : action.includes("watch") ? 0.4 : -0.6;
+  const rankingPenalty = index * 0.8;
+  return Number(Math.max(0.5, (baseByProfile[profile] ?? 4) + confidenceBonus + actionBonus - rankingPenalty).toFixed(1));
+}
+
+function buildExecutionNote(
+  horizon: "intraday" | "swing" | "position",
+  style: "trend" | "narrative" | "scalp",
+  action: string,
+): string {
+  if (horizon === "intraday" && style === "scalp") {
+    return `Use ${action} only around fast confirmation and keep the holding window short.`;
+  }
+  if (horizon === "position") {
+    return `Use ${action} as a staged build, not a one-shot entry, and let the thesis play over several sessions.`;
+  }
+  if (style === "narrative") {
+    return `Anchor ${action} on ELFA narrative persistence, not just on the first whale burst.`;
+  }
+  return `Treat ${action} as a tactical continuation setup and scale around confirmation rather than chasing.`;
 }
 
 export function TerminalView({
@@ -812,8 +1450,8 @@ export function WatchlistsView({
                 Create watchlist
               </button>
             ) : (
-              <button type="button" className="button-primary" onClick={() => void privy.login()}>
-                Connect to save
+              <button type="button" className="button-primary" disabled={!privy.isConfigured || !privy.ready} onClick={() => void privy.login()}>
+                {privy.isConfigured ? (privy.ready ? "Connect to save" : "Privy is waking up") : "Privy not configured"}
               </button>
             )}
           </div>
@@ -828,7 +1466,7 @@ export function WatchlistsView({
               <p>Privy plugs into this space to store identity, saved lists, favorite symbols, personal filters, and a reusable signal workflow.</p>
               <div className="watchlists-user-chip">
                 <strong>{userLabel}</strong>
-                <span>{privy.authenticated ? "watchlists can be persisted" : "connect to save this space"}</span>
+                <span>{privy.authenticated ? "watchlists can be persisted" : privy.message}</span>
               </div>
               <ul className="insight-list">
                 <li>saved watchlists by mood, setup, or timeframe</li>
@@ -957,6 +1595,7 @@ export function WatchlistsView({
         <article className="panel playful-note">
           <span className="eyebrow">Privy next</span>
           <h2>Save your own signal universe</h2>
+          <p className="story-copy">{privy.message}</p>
           <ul className="insight-list">
             <li>watchlists tied to a connected user</li>
             <li>saved moods, filters, and alert styles</li>
@@ -1135,4 +1774,30 @@ export function useNoiseAccent(symbols: SymbolCard[]) {
     })),
     symbols,
   );
+}
+
+function formatDiscordAdvisorMessage({
+  question,
+  answer,
+  profile,
+  walletAmount,
+  timeHorizon,
+  tradingStyle,
+  status,
+}: {
+  question: string;
+  answer: string;
+  profile: "prudent" | "balanced" | "aggressive";
+  walletAmount: number;
+  timeHorizon: "intraday" | "swing" | "position";
+  tradingStyle: "trend" | "narrative" | "scalp";
+  status: string;
+}) {
+  return [
+    "DeepSignal ELFA Advisor",
+    `Profile: ${profile.toUpperCase()} | Wallet: $${walletAmount.toLocaleString()} | Horizon: ${timeHorizon} | Style: ${tradingStyle}`,
+    `Status: ${status}`,
+    `Question: ${question}`,
+    `Answer: ${answer}`,
+  ].join("\n");
 }

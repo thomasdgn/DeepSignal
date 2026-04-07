@@ -1,0 +1,270 @@
+{
+  "generated_at": "2026-04-06T14:44:39.798398+00:00",
+  "lookback_hours": 24,
+  "advisor_status": "ready",
+  "elfa_status": "live",
+  "market_summary": {
+    "elfa_status": "live",
+    "summary_line": "DeepSignal Advisor | Hot on Pacifica: SOL, BTC, ETH | ELFA trend map: limited context",
+    "trending_tokens": []
+  },
+  "agent_brief": {
+    "status": "error",
+    "mode": "summary",
+    "summary": "ELFA agent sees SOL as the lead context symbol right now, with open_long flow setting the tone. Use the Pacifica ranking together with social confirmation before sizing in. ELFA agent fallback active because chat failed: ELFA request failed for /v2/chat: 403 Client Error: Forbidden for url: https://api.elfa.ai/v2/chat",
+    "action_items": [
+      "Start from SOL because it currently anchors the strongest signal stack.",
+      "Prioritize symbols where whale flow and ELFA attention both align before entering.",
+      "Use smaller sizing first if the move already feels crowded or over-extended."
+    ],
+    "caution": "This layer is an advisor for trend selection and timing context, not an automatic allocation engine.",
+    "prompt_basis": {
+      "hot_symbols": [
+        "SOL",
+        "BTC",
+        "ETH"
+      ],
+      "ranked_symbols": [
+        "SOL",
+        "BTC",
+        "SOL"
+      ]
+    }
+  },
+  "default_profile": "balanced",
+  "signals": [
+    {
+      "profile": "balanced",
+      "symbol": "SOL",
+      "side": "open_long",
+      "action": "bias long",
+      "confidence": "high",
+      "score": 97.4,
+      "severity": "medium",
+      "attention_score": 95.0,
+      "allocation_hint": "3 to 6% tactical size",
+      "entry_style": "split entry between breakout and retest",
+      "thesis": "Mentions: Crowded momentum with unusually strong attention",
+      "risk": "wait for confirmation and size entries carefully",
+      "discord_message": "DeepSignal Advisor | BALANCED | SOL | BIAS LONG | score=97.4 | attention=95 | Mentions: Crowded momentum with unusually strong attention | Entry: split entry between breakout and retest | Size: 3 to 6% tactical size | Risk: wait for confirmation and size entries carefully"
+    },
+    {
+      "profile": "balanced",
+      "symbol": "BTC",
+      "side": "open_long",
+      "action": "bias long",
+      "confidence": "high",
+      "score": 95.2,
+      "severity": "high",
+      "attention_score": 93.0,
+      "allocation_hint": "3 to 6% tactical size",
+      "entry_style": "split entry between breakout and retest",
+      "thesis": "Mentions: Macro narrative and whale conviction align",
+      "risk": "wait for confirmation and size entries carefully",
+      "discord_message": "DeepSignal Advisor | BALANCED | BTC | BIAS LONG | score=95.2 | attention=93 | Mentions: Macro narrative and whale conviction align | Entry: split entry between breakout and retest | Size: 3 to 6% tactical size | Risk: wait for confirmation and size entries carefully"
+    },
+    {
+      "profile": "balanced",
+      "symbol": "SOL",
+      "side": "open_long",
+      "action": "bias long",
+      "confidence": "high",
+      "score": 91.7,
+      "severity": "medium",
+      "attention_score": 86.0,
+      "allocation_hint": "3 to 6% tactical size",
+      "entry_style": "split entry between breakout and retest",
+      "thesis": "Mentions: Social acceleration and breakout continuation",
+      "risk": "wait for confirmation and size entries carefully",
+      "discord_message": "DeepSignal Advisor | BALANCED | SOL | BIAS LONG | score=91.7 | attention=86 | Mentions: Social acceleration and breakout continuation | Entry: split entry between breakout and retest | Size: 3 to 6% tactical size | Risk: wait for confirmation and size entries carefully"
+    }
+  ],
+  "discord_messages": [
+    "DeepSignal Advisor | Hot on Pacifica: SOL, BTC, ETH | ELFA trend map: limited context | profile=BALANCED | mode=risk-adjusted participation",
+    "DeepSignal Advisor | BALANCED | SOL | BIAS LONG | score=97.4 | attention=95 | Mentions: Crowded momentum with unusually strong attention | Entry: split entry between breakout and retest | Size: 3 to 6% tactical size | Risk: wait for confirmation and size entries carefully",
+    "DeepSignal Advisor | BALANCED | BTC | BIAS LONG | score=95.2 | attention=93 | Mentions: Macro narrative and whale conviction align | Entry: split entry between breakout and retest | Size: 3 to 6% tactical size | Risk: wait for confirmation and size entries carefully",
+    "DeepSignal Advisor | BALANCED | SOL | BIAS LONG | score=91.7 | attention=86 | Mentions: Social acceleration and breakout continuation | Entry: split entry between breakout and retest | Size: 3 to 6% tactical size | Risk: wait for confirmation and size entries carefully"
+  ],
+  "profiles": {
+    "prudent": {
+      "label": "Prudent",
+      "entry_bias": "confirmation first",
+      "size_hint": "1 to 3% starter size",
+      "watch_bias": "prefer observe-only or delayed entries",
+      "discord_tone": "capital preservation first",
+      "signals": [
+        {
+          "profile": "prudent",
+          "symbol": "SOL",
+          "side": "open_long",
+          "action": "bias long",
+          "confidence": "high",
+          "score": 97.4,
+          "severity": "medium",
+          "attention_score": 95.0,
+          "allocation_hint": "1 to 3% starter size",
+          "entry_style": "scale after confirmation",
+          "thesis": "Mentions: Crowded momentum with unusually strong attention",
+          "risk": "stay patient and avoid chasing if structure is not confirmed",
+          "discord_message": "DeepSignal Advisor | PRUDENT | SOL | BIAS LONG | score=97.4 | attention=95 | Mentions: Crowded momentum with unusually strong attention | Entry: scale after confirmation | Size: 1 to 3% starter size | Risk: stay patient and avoid chasing if structure is not confirmed"
+        },
+        {
+          "profile": "prudent",
+          "symbol": "BTC",
+          "side": "open_long",
+          "action": "bias long",
+          "confidence": "high",
+          "score": 95.2,
+          "severity": "high",
+          "attention_score": 93.0,
+          "allocation_hint": "1 to 3% starter size",
+          "entry_style": "scale after confirmation",
+          "thesis": "Mentions: Macro narrative and whale conviction align",
+          "risk": "stay patient and avoid chasing if structure is not confirmed",
+          "discord_message": "DeepSignal Advisor | PRUDENT | BTC | BIAS LONG | score=95.2 | attention=93 | Mentions: Macro narrative and whale conviction align | Entry: scale after confirmation | Size: 1 to 3% starter size | Risk: stay patient and avoid chasing if structure is not confirmed"
+        },
+        {
+          "profile": "prudent",
+          "symbol": "SOL",
+          "side": "open_long",
+          "action": "watch for entry",
+          "confidence": "high",
+          "score": 91.7,
+          "severity": "medium",
+          "attention_score": 86.0,
+          "allocation_hint": "1 to 3% starter size",
+          "entry_style": "wait for a second confirmation candle",
+          "thesis": "Mentions: Social acceleration and breakout continuation",
+          "risk": "stay patient and avoid chasing if structure is not confirmed",
+          "discord_message": "DeepSignal Advisor | PRUDENT | SOL | WATCH FOR ENTRY | score=91.7 | attention=86 | Mentions: Social acceleration and breakout continuation | Entry: wait for a second confirmation candle | Size: 1 to 3% starter size | Risk: stay patient and avoid chasing if structure is not confirmed"
+        }
+      ],
+      "discord_messages": [
+        "DeepSignal Advisor | Hot on Pacifica: SOL, BTC, ETH | ELFA trend map: limited context | profile=PRUDENT | mode=capital preservation first",
+        "DeepSignal Advisor | PRUDENT | SOL | BIAS LONG | score=97.4 | attention=95 | Mentions: Crowded momentum with unusually strong attention | Entry: scale after confirmation | Size: 1 to 3% starter size | Risk: stay patient and avoid chasing if structure is not confirmed",
+        "DeepSignal Advisor | PRUDENT | BTC | BIAS LONG | score=95.2 | attention=93 | Mentions: Macro narrative and whale conviction align | Entry: scale after confirmation | Size: 1 to 3% starter size | Risk: stay patient and avoid chasing if structure is not confirmed",
+        "DeepSignal Advisor | PRUDENT | SOL | WATCH FOR ENTRY | score=91.7 | attention=86 | Mentions: Social acceleration and breakout continuation | Entry: wait for a second confirmation candle | Size: 1 to 3% starter size | Risk: stay patient and avoid chasing if structure is not confirmed"
+      ]
+    },
+    "balanced": {
+      "label": "Balanced",
+      "entry_bias": "scale in on confirmation",
+      "size_hint": "3 to 6% tactical size",
+      "watch_bias": "watch for entry on clean continuation",
+      "discord_tone": "risk-adjusted participation",
+      "signals": [
+        {
+          "profile": "balanced",
+          "symbol": "SOL",
+          "side": "open_long",
+          "action": "bias long",
+          "confidence": "high",
+          "score": 97.4,
+          "severity": "medium",
+          "attention_score": 95.0,
+          "allocation_hint": "3 to 6% tactical size",
+          "entry_style": "split entry between breakout and retest",
+          "thesis": "Mentions: Crowded momentum with unusually strong attention",
+          "risk": "wait for confirmation and size entries carefully",
+          "discord_message": "DeepSignal Advisor | BALANCED | SOL | BIAS LONG | score=97.4 | attention=95 | Mentions: Crowded momentum with unusually strong attention | Entry: split entry between breakout and retest | Size: 3 to 6% tactical size | Risk: wait for confirmation and size entries carefully"
+        },
+        {
+          "profile": "balanced",
+          "symbol": "BTC",
+          "side": "open_long",
+          "action": "bias long",
+          "confidence": "high",
+          "score": 95.2,
+          "severity": "high",
+          "attention_score": 93.0,
+          "allocation_hint": "3 to 6% tactical size",
+          "entry_style": "split entry between breakout and retest",
+          "thesis": "Mentions: Macro narrative and whale conviction align",
+          "risk": "wait for confirmation and size entries carefully",
+          "discord_message": "DeepSignal Advisor | BALANCED | BTC | BIAS LONG | score=95.2 | attention=93 | Mentions: Macro narrative and whale conviction align | Entry: split entry between breakout and retest | Size: 3 to 6% tactical size | Risk: wait for confirmation and size entries carefully"
+        },
+        {
+          "profile": "balanced",
+          "symbol": "SOL",
+          "side": "open_long",
+          "action": "bias long",
+          "confidence": "high",
+          "score": 91.7,
+          "severity": "medium",
+          "attention_score": 86.0,
+          "allocation_hint": "3 to 6% tactical size",
+          "entry_style": "split entry between breakout and retest",
+          "thesis": "Mentions: Social acceleration and breakout continuation",
+          "risk": "wait for confirmation and size entries carefully",
+          "discord_message": "DeepSignal Advisor | BALANCED | SOL | BIAS LONG | score=91.7 | attention=86 | Mentions: Social acceleration and breakout continuation | Entry: split entry between breakout and retest | Size: 3 to 6% tactical size | Risk: wait for confirmation and size entries carefully"
+        }
+      ],
+      "discord_messages": [
+        "DeepSignal Advisor | Hot on Pacifica: SOL, BTC, ETH | ELFA trend map: limited context | profile=BALANCED | mode=risk-adjusted participation",
+        "DeepSignal Advisor | BALANCED | SOL | BIAS LONG | score=97.4 | attention=95 | Mentions: Crowded momentum with unusually strong attention | Entry: split entry between breakout and retest | Size: 3 to 6% tactical size | Risk: wait for confirmation and size entries carefully",
+        "DeepSignal Advisor | BALANCED | BTC | BIAS LONG | score=95.2 | attention=93 | Mentions: Macro narrative and whale conviction align | Entry: split entry between breakout and retest | Size: 3 to 6% tactical size | Risk: wait for confirmation and size entries carefully",
+        "DeepSignal Advisor | BALANCED | SOL | BIAS LONG | score=91.7 | attention=86 | Mentions: Social acceleration and breakout continuation | Entry: split entry between breakout and retest | Size: 3 to 6% tactical size | Risk: wait for confirmation and size entries carefully"
+      ]
+    },
+    "aggressive": {
+      "label": "Aggressive",
+      "entry_bias": "lean into momentum early",
+      "size_hint": "5 to 10% high-conviction size",
+      "watch_bias": "act earlier when social confirmation is live",
+      "discord_tone": "high beta, fast reaction",
+      "signals": [
+        {
+          "profile": "aggressive",
+          "symbol": "SOL",
+          "side": "open_long",
+          "action": "bias long",
+          "confidence": "high",
+          "score": 97.4,
+          "severity": "medium",
+          "attention_score": 95.0,
+          "allocation_hint": "5 to 10% high-conviction size",
+          "entry_style": "probe quickly into strength",
+          "thesis": "Mentions: Crowded momentum with unusually strong attention",
+          "risk": "wait for confirmation and size entries carefully",
+          "discord_message": "DeepSignal Advisor | AGGRESSIVE | SOL | BIAS LONG | score=97.4 | attention=95 | Mentions: Crowded momentum with unusually strong attention | Entry: probe quickly into strength | Size: 5 to 10% high-conviction size | Risk: wait for confirmation and size entries carefully"
+        },
+        {
+          "profile": "aggressive",
+          "symbol": "BTC",
+          "side": "open_long",
+          "action": "bias long",
+          "confidence": "high",
+          "score": 95.2,
+          "severity": "high",
+          "attention_score": 93.0,
+          "allocation_hint": "5 to 10% high-conviction size",
+          "entry_style": "probe quickly into strength",
+          "thesis": "Mentions: Macro narrative and whale conviction align",
+          "risk": "wait for confirmation and size entries carefully",
+          "discord_message": "DeepSignal Advisor | AGGRESSIVE | BTC | BIAS LONG | score=95.2 | attention=93 | Mentions: Macro narrative and whale conviction align | Entry: probe quickly into strength | Size: 5 to 10% high-conviction size | Risk: wait for confirmation and size entries carefully"
+        },
+        {
+          "profile": "aggressive",
+          "symbol": "SOL",
+          "side": "open_long",
+          "action": "bias long",
+          "confidence": "high",
+          "score": 91.7,
+          "severity": "medium",
+          "attention_score": 86.0,
+          "allocation_hint": "5 to 10% high-conviction size",
+          "entry_style": "probe quickly into strength",
+          "thesis": "Mentions: Social acceleration and breakout continuation",
+          "risk": "wait for confirmation and size entries carefully",
+          "discord_message": "DeepSignal Advisor | AGGRESSIVE | SOL | BIAS LONG | score=91.7 | attention=86 | Mentions: Social acceleration and breakout continuation | Entry: probe quickly into strength | Size: 5 to 10% high-conviction size | Risk: wait for confirmation and size entries carefully"
+        }
+      ],
+      "discord_messages": [
+        "DeepSignal Advisor | Hot on Pacifica: SOL, BTC, ETH | ELFA trend map: limited context | profile=AGGRESSIVE | mode=high beta, fast reaction",
+        "DeepSignal Advisor | AGGRESSIVE | SOL | BIAS LONG | score=97.4 | attention=95 | Mentions: Crowded momentum with unusually strong attention | Entry: probe quickly into strength | Size: 5 to 10% high-conviction size | Risk: wait for confirmation and size entries carefully",
+        "DeepSignal Advisor | AGGRESSIVE | BTC | BIAS LONG | score=95.2 | attention=93 | Mentions: Macro narrative and whale conviction align | Entry: probe quickly into strength | Size: 5 to 10% high-conviction size | Risk: wait for confirmation and size entries carefully",
+        "DeepSignal Advisor | AGGRESSIVE | SOL | BIAS LONG | score=91.7 | attention=86 | Mentions: Social acceleration and breakout continuation | Entry: probe quickly into strength | Size: 5 to 10% high-conviction size | Risk: wait for confirmation and size entries carefully"
+      ]
+    }
+  }
+}

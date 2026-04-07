@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
+from deepsignal.advisor import DeepSignalAdvisor
 from deepsignal.account_analysis import AccountAnalysisService
 from deepsignal.alerting import AlertDispatcher
 from deepsignal.config import Settings
@@ -36,6 +37,11 @@ class DeepSignalApp:
         )
         self.storage = DeepSignalStorage(settings.database_path)
         self.account_analysis = AccountAnalysisService(self.rest_client, self.storage)
+        self.advisor = DeepSignalAdvisor(
+            self.storage,
+            elfa_api_key=settings.elfa_api_key,
+            elfa_base_url=settings.elfa_base_url,
+        )
 
     def print_bootstrap_snapshot(self) -> None:
         markets = self.rest_client.get_market_info()
@@ -113,6 +119,19 @@ class DeepSignalApp:
         seeded = self.seed_demo_data()
         report_path = self.generate_dashboard(lookback_hours=lookback_hours)
         return seeded, report_path
+
+    def export_advisor_brief(self, lookback_hours: int = 24) -> Path:
+        advisor_path = self.settings.reports_dir / "advisor-brief.json"
+        public_path = Path(__file__).resolve().parents[1] / "frontend" / "public" / "advisor-brief.json"
+        self.advisor.export_brief(advisor_path, lookback_hours=lookback_hours)
+        return self.advisor.export_brief(public_path, lookback_hours=lookback_hours)
+
+    def ask_advisor_question(self, question: str, lookback_hours: int = 24) -> dict[str, object]:
+        return self.advisor.ask_agent(question, lookback_hours=lookback_hours)
+
+    def send_advisor_message_to_discord(self, content: str) -> dict[str, object]:
+        self.alert_dispatcher.send_discord_message(content)
+        return {"status": "sent", "channel": "discord"}
 
     def load_watchlist(self) -> list[WatchlistEntry]:
         return load_watchlist(self.settings.watchlist_path)

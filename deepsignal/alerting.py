@@ -158,6 +158,11 @@ class AlertDispatcher:
         }
         self._post(self.generic_webhook_url, payload)
 
+    def send_discord_message(self, content: str) -> None:
+        if not self.discord_webhook_url:
+            raise RuntimeError("DISCORD_WEBHOOK_URL is not configured")
+        self._post(self.discord_webhook_url, {"content": content})
+
     def _post(self, url: str | None, payload: dict[str, Any]) -> None:
         if not url:
             return

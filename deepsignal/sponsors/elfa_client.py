@@ -66,6 +66,39 @@ class ElfaApiClient:
             },
         )
 
+    def get_trending_tokens(
+        self,
+        *,
+        time_window: str = "24h",
+        page: int = 1,
+        page_size: int = 10,
+        min_mentions: int = 3,
+        ) -> dict[str, Any]:
+        return self._get(
+            "/v2/aggregations/trending-tokens",
+            params={
+                "timeWindow": time_window,
+                "page": page,
+                "pageSize": page_size,
+                "minMentions": min_mentions,
+            },
+        )
+
+    def chat(
+        self,
+        *,
+        message: str,
+        mode: str = "summary",
+        conversation_id: str | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "message": message,
+            "mode": mode,
+        }
+        if conversation_id:
+            payload["conversationId"] = conversation_id
+        return self._post("/v2/chat", json_body=payload)
+
     def _get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         try:
             response = requests.get(
@@ -75,6 +108,23 @@ class ElfaApiClient:
                     "x-elfa-api-key": self.api_key,
                 },
                 params=params,
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as exc:
+            raise RuntimeError(f"ELFA request failed for {path}: {exc}") from exc
+
+    def _post(self, path: str, json_body: dict[str, Any]) -> dict[str, Any]:
+        try:
+            response = requests.post(
+                f"{self.base_url}{path}",
+                headers={
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "x-elfa-api-key": self.api_key,
+                },
+                json=json_body,
                 timeout=self.timeout,
             )
             response.raise_for_status()
